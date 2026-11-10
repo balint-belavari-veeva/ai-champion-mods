@@ -929,10 +929,10 @@ function drawVaultPicker($, e) {
     const sb = isSandbox(v)
     const confirm = V.confirm === v.dns
     const label = (v.dns === V.current ? '▸ ' : '  ') + (confirm ? 'press again to confirm: ' : '') + shortName(v.name)
-    // Signed in: the whole row is green (sandbox) or yellow (production). Signed out: plain.
-    const text = `${label}  ${sb ? 'sandbox' : '⚠ production'}${V.used.includes(v.dns) ? '  · used in this chat' : ''}`
+    // Signed in: the Vault's name is green (sandbox) or yellow (production); the tag stays dim. Signed out: plain.
+    const rest = `  ${sb ? 'sandbox' : '⚠ production'}${V.used.includes(v.dns) ? '  · used in this chat' : ''}`
     const tone = V.valid ? (sb ? { color: 'green' } : { color: 'yellow', bold: true }) : {}
-    const props = { key: 'v-' + v.dns, label: text, children: [Text({ ...tone, children: [text] })], plain: true, dimColor: !!V.busy, onPress: () => (V.busy ? undefined : pickVault($, v)) }
+    const props = { key: 'v-' + v.dns, label: label + rest, children: [Text({ ...tone, children: [label] }), Text({ dimColor: true, children: [rest] })], plain: true, dimColor: !!V.busy, onPress: () => (V.busy ? undefined : pickVault($, v)) }
     if (i < 9) props.hotkey = String(i + 1)
     return Button(props)
   })

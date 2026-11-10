@@ -14,7 +14,7 @@ Then open a **new** Claude Code chat (mods load at chat start). Needs Claude Cod
 
 | Piece | What it does |
 |---|---|
-| Status line | `model  [bar] % ctx  vault: <Vaults this chat used>`. Most recent first and bold; green = sandbox, amber `⚠` = not provably a sandbox (treat as production). Built from the chat's own `vault` commands by a PostToolUse hook (`hooks/vault-track.py`), so two chats show their own Vaults. `(CLI now on X)` warns that another chat or terminal ran `vault switch` and commands without `--dns` will hit X. Red `vault: logged out` when the CLI session expired. Base status line by Patrick (Veeva AI Champion team). |
+| Status line | `model  [bar] % ctx` (Patrick's script). The per-chat Vault list was dropped in cache-keeper 2.2.1; the Vault picker (`/vault`, band button) is the one place Vaults show. The `vault-track.py` hook stays: it feeds the picker's "used in this chat" and its logged-out name cache. |
 | Handoff, 1 click | The `handoff` button (or `/handoff`) writes a session handoff, saves it to `~/.claude/mods-data/cache-keeper/handoffs/`, clears the chat and sends the handoff as the first prompt. Before: 2 clicks. |
 | Cache Keeper | Cache warm/cold band, `/keepwarm`, `/board` across chats, cold-send guard. |
 | Goal Meter | Progress bar and ETA for `/goal`, `/goals`. |
