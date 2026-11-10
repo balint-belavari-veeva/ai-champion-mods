@@ -2,6 +2,7 @@
 
 - install.sh: always runs `claude plugin marketplace update` before installing/updating plugins (previously skipped when `marketplace add` succeeded, which left stale plugin versions).
 
+- cache-keeper 2.3.0: one place. The band now also shows model + context bar (`[##--------] 12% ctx`), read from `~/.claude/ctx-state/<session>.json`, which the status line script writes (it now prints nothing; only the status line gets the context % from Claude Code). Vault picker colours only the active Vault (green sandbox, yellow production); other rows plain. Run `install.sh` to refresh the status line script.
 - cache-keeper 2.2.2: Vault picker rows no longer have 1-9 hotkeys (only the first nine had them); click only. `l` for log in stays.
 - cache-keeper 2.2.1: status line no longer shows the Vault segment (picker only). Picker colours just the Vault's name (green sandbox, yellow production) while signed in; the tag and "used in this chat" stay dim.
 - cache-keeper 2.2.0: Vault picker rows are coloured as a whole (green sandbox, yellow production) while signed in, plain when signed out; the tag now reads `⚠ production` instead of `⚠ not a sandbox`. New `board` band button (hotkey b) opens the Sessions board, same as `/board`.

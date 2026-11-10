@@ -3,6 +3,15 @@
 
 input=$(cat)
 
+# The cache-keeper band (above the prompt) draws model + context now, so everything
+# sits in one row. This script only hands it the numbers and prints nothing.
+sid=$(echo "$input" | jq -r '.session_id // empty')
+if [ -n "$sid" ]; then
+  mkdir -p "$HOME/.claude/ctx-state"
+  echo "$input" | jq -c '{model: (.model.display_name // "Claude"), pct: (.context_window.used_percentage // null)}' > "$HOME/.claude/ctx-state/$sid.json"
+fi
+exit 0
+
 model=$(echo "$input" | jq -r '.model.display_name // "Claude"')
 used=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
 

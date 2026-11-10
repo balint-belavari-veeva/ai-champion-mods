@@ -260,6 +260,15 @@ function cacheState(hb) {
   return { kind: 'warm', left }
 }
 
+// Model + context % handed over by the status line script (it alone gets them from Claude Code).
+let ctxCache = { at: 0, v: null }
+async function ctxState($) {
+  if (!S.id || !home) return null
+  if (Date.now() - ctxCache.at < 1500) return ctxCache.v
+  ctxCache = { at: Date.now(), v: await readJson($, home + '/.claude/ctx-state/' + S.id + '.json', null) }
+  return ctxCache.v
+}
+
 function myHeartbeat() {
   const coldUsd = S.coldRestarts.reduce((a, c) => a + c.usd, 0)
   let state = 'idle'
@@ -743,6 +752,15 @@ export function register(on) {
     if (st.kind === 'unknown') parts.unshift(Text({ dimColor: true, children: ['○ cache unknown until next message'] }))
     parts.push(Text({ dimColor: true, children: [S.costUsd ? ` │ session ${money(S.costUsd)}` : ' │ session –'] }))
     if (S.coldRestarts.length) parts.push(Text({ dimColor: true, children: [` │ ${S.coldRestarts.length} cold restart${S.coldRestarts.length === 1 ? '' : 's'} ${money(S.coldRestarts.reduce((a, c) => a + c.usd, 0))}`] }))
+    const cx = await ctxState($)
+    if (cx) {
+      const pct = cx.pct == null ? null : Math.round(cx.pct)
+      parts.push(Text({ dimColor: true, children: [` │ ${cx.model}`] }))
+      if (pct != null) {
+        const f = Math.max(0, Math.min(10, Math.round(pct / 10)))
+        parts.push(Text({ color: pct < 20 ? 'green' : pct < 25 ? 'yellow' : 'red', children: [` [${'#'.repeat(f)}${'-'.repeat(10 - f)}] ${pct}% ctx`] }))
+      }
+    }
     const row = [Box({ flexDirection: 'row', children: parts })]
     if (st.kind === 'cooling' && big) {
       row.push(Button({ key: 'keepwarm', label: 'keep warm', hotkey: '1', plain: true, onPress: async () => { now = await $.clock.now(); startKeepWarm($, settings.keepWarmHours); await heartbeat($, true); $.ui.invalidate('ui.render') } }))
@@ -929,9 +947,9 @@ function drawVaultPicker($, e) {
     const sb = isSandbox(v)
     const confirm = V.confirm === v.dns
     const label = (v.dns === V.current ? '▸ ' : '  ') + (confirm ? 'press again to confirm: ' : '') + shortName(v.name)
-    // Signed in: the Vault's name is green (sandbox) or yellow (production); the tag stays dim. Signed out: plain.
+    // Only the active Vault (the CLI's current one) is coloured: green sandbox, yellow production. The tag stays dim.
     const rest = `  ${sb ? 'sandbox' : '⚠ production'}${V.used.includes(v.dns) ? '  · used in this chat' : ''}`
-    const tone = V.valid ? (sb ? { color: 'green' } : { color: 'yellow', bold: true }) : {}
+    const tone = V.valid && v.dns === V.current ? (sb ? { color: 'green', bold: true } : { color: 'yellow', bold: true }) : {}
     const props = { key: 'v-' + v.dns, label: label + rest, children: [Text({ ...tone, children: [label] }), Text({ dimColor: true, children: [rest] })], plain: true, dimColor: !!V.busy, onPress: () => (V.busy ? undefined : pickVault($, v)) }
     return Button(props)
   })
