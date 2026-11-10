@@ -173,7 +173,7 @@ async function configText($) {
 }
 
 async function registerCommand($) {
-  const spec = { name: 'rec', description: 'Recording mode: hide keys, personal details, business figures, and private files on screen (/rec strict, /rec off, /rec config)', argumentHint: '[strict|off|config]', immediate: true }
+  const spec = { name: 'rec', description: 'Recording mode: hide keys, personal details, business figures, and private files on screen (/rec strict, /rec off, /rec config, /rec panel)', argumentHint: '[strict|off|config|panel]', immediate: true }
   try {
     await $.command.register(spec)
     return 'rec'
@@ -201,6 +201,11 @@ export function register(on) {
   on('command.run', { command: ['rec', 'recording'] }, async ($, e) => {
     const arg = String(e.args || '').trim().toLowerCase()
     if (arg === 'config') return { text: await configText($) }
+    if (arg === 'panel') {
+      if (!(await $.session.surface())) return { text: rec.on ? 'Recording mode is on.' : 'Recording mode is off.' }
+      await $.ui.open({ id: RPANE, title: 'Recording', focus: true, closeOnEscape: true })
+      return {}
+    }
     if (arg === 'off' || (arg === '' && rec.on)) {
       await setFlag($, false, false)
       $.ui.toast('Recording mode off.' + (blocked ? ` It kept ${blocked} private file${blocked === 1 ? '' : 's'} closed.` : ''))
@@ -211,6 +216,11 @@ export function register(on) {
     await setFlag($, true, strict)
     $.ui.toast(`Recording mode on${strict ? ' (strict)' : ''}.`, { timeoutMs: 3000 })
     return {}
+  })
+
+  on('ui.render', { component: 'Pane' }, async ($, e, next) => {
+    if (e.requestId !== RPANE) return next(e)
+    return drawPane($, e)
   })
 
   // Claude reads a note beside each prompt while recording, and one more when it stops
@@ -275,4 +285,28 @@ export function register(on) {
     const modes = Array.isArray(e.props && e.props.modes) ? e.props.modes : []
     return next({ ...e, props: { ...e.props, modes: ['● REC', ...modes] } })
   })
+}
+
+const RPANE = 'recording-panel'
+
+function drawPane($, e) {
+  const { Box, Text, Button } = $.ui.resolve(e)
+  const vs = e.surface === 'vscode'
+  const state = rec.on ? (rec.strict ? 'ON (strict)' : 'ON') : 'OFF'
+  const card = (children) => Box({ flexDirection: 'column', rowGap: 0, children, ...(vs ? { borderStyle: 'round', borderColor: rec.on ? 'red' : 'gray', paddingX: 1 } : {}) })
+  const status = card([
+    Text({ color: rec.on ? 'red' : undefined, bold: rec.on, dimColor: !rec.on, children: [rec.on ? `● REC ${state}` : `○ Recording ${state}`] }),
+    Text({ dimColor: true, children: [rec.on ? `${blocked} private file${blocked === 1 ? '' : 's'} kept closed this session` : 'Masks keys, personal details and business figures while you record.'] }),
+  ])
+  const buttons = Box({
+    flexDirection: 'row',
+    columnGap: 2,
+    children: [
+      Button({ key: 'rec-on', label: rec.on && !rec.strict ? 'Recording' : 'Start', variant: rec.on && !rec.strict ? undefined : 'primary', onPress: () => setFlag($, true, false) }),
+      Button({ key: 'rec-strict', label: rec.strict ? 'Strict on' : 'Strict', onPress: () => setFlag($, true, true) }),
+      Button({ key: 'rec-off', label: 'Stop', onPress: () => { blocked = 0; return setFlag($, false, false) } }),
+    ],
+  })
+  const counts = Text({ dimColor: true, children: [`Config: ${config.keepNames.length} kept name(s), ${config.names.length} hidden name(s), ${config.privatePaths.length} private path(s). /rec config shows the file.`] })
+  return Box({ flexDirection: 'column', rowGap: 1, children: [status, buttons, counts] })
 }

@@ -1,4 +1,18 @@
+- cache-keeper 2.10.0: terminal Vault picker no longer marks the CLI's current Vault (no ▸, no bold), so nothing is flagged on open except Vaults actually used in this chat; a click flags the one you picked and the earlier ones stay. Switching/log-in messages animate 0-3 trailing dots while busy (terminal and VS Code).
+- cache-keeper 2.9.3: fixed the agents pane never opening: `APANE` was used but never declared (ReferenceError in `openAgents` and the Pane render hook since 2.5.0). Verified with a `claude plugin test` run (band button opens the pane, cards draw, terminal and VS Code).
+- cache-keeper 2.9.2: picker opens faster: `vault status` and `vault list` run in parallel (~2s each), and the auto-activate of the CLI's Vault no longer triggers a second full refresh (2.9.1 doubled the load time).
+- cache-keeper 2.9.1: agents pane fix (`plain: false` / an empty Text made the tree invalid, so the pane never drew; draw errors now show in the pane). VS Code Vault picker flags the CLI's current Vault as active on open, unless deactivated earlier in the session.
+- cache-keeper 2.9.0: band shows model + context bar in VS Code too (no status line script there: falls back to the session's own usage; terminal still reads the script's file). The band's `board` button is now `agents` (hotkey a) in terminal and VS Code; `/board` still exists. Vault search box now in the terminal picker too; its "log in again" button lost the `l` hotkey so typing in the search cannot trigger it.
+- cache-keeper 2.8.0: VS Code Vault picker opens at once and shows "Checking Vault status…" while it reads the real state; only Vaults activated in this chat show as active (the CLI's current one just gets a dim "CLI here" tag); Activate/Deactivate buttons read "Activating…"/"Deactivating…" and lock the others while working. Terminal unchanged.
+- cache-keeper 2.7.1: VS Code picker: removed "Point CLI here"; Activate now only marks the Vault active (CLI untouched, Claude switches itself). Max 6 active per chat.
+- cache-keeper 2.7.0: VS Code Vault picker is multi-active. Buttons read Activate / Point CLI here / Deactivate (no more "Switch"); every active Vault stays highlighted. With 2+ active Vaults, a short note rides along with each typed prompt telling Claude the CLI points at one at a time and to `vault switch --dns` between them (never into production unless asked). Terminal picker unchanged.
+- cache-keeper 2.6.0: VS Code Vault picker gets a search box (filters by name or DNS) and drops the "log in again" button while signed in (shown only when signed out). Terminal picker unchanged.
+- cache-keeper 2.5.1: the agents pane command is `/ck-agents` (Claude Code has a built-in /agents that shadowed ours).
+- goal-meter 1.1.1: Goal meter pane in VS Code is capped to 36 columns (was 50+ with a bar up to 120), which overflowed the narrow side panel and made the tab strip jump.
 # Changes from Nate Herk's originals
+
+- recording-mode 1.2.0: `/rec panel` opens a Recording pane (status, Start / Strict / Stop buttons, config counts) for VS Code and Desktop. `/rec` itself unchanged.
+- cache-keeper 2.5.0: VS Code layout for the Vault picker (one card per Vault, native Switch / Confirm switch button on the right, active Vault marked); terminal picker untouched. New `/agents` pane (terminal text fallback too): each agent of this session with status, context bar, cost, request count, model, Refresh button; cost/context are tracked from the agent loop's own requests.
 
 - install.sh: always runs `claude plugin marketplace update` before installing/updating plugins (previously skipped when `marketplace add` succeeded, which left stale plugin versions).
 

@@ -15,6 +15,7 @@ import { makeMasker } from './privacy.mjs'
 const MIN = 60000
 const HEARTBEAT_EVERY = 30000
 const PANE = 'cache-board'
+const APANE = 'agents-pane'
 
 // This session
 const S = {
@@ -46,7 +47,7 @@ const S = {
 }
 
 const settings = { bigTokens: 150000, guard: true, ttlMin: 0, alerts: true, keepWarmHours: 4 }
-const names = { cache: 'cache', keepwarm: 'keepwarm', board: 'board', handoff: 'handoff', vault: 'vault' }
+const names = { cache: 'cache', keepwarm: 'keepwarm', board: 'board', handoff: 'handoff', vault: 'vault', agents: 'agents' }
 
 let now = 0
 let home = ''
@@ -56,6 +57,9 @@ let mask = (s) => s
 let fleet = [] // heartbeats of every session, this one included
 const alerted = new Map() // sessionId -> state or warning key already announced
 let paneOpen = false
+let agentsOpen = false
+const AG = new Map() // agentId -> { tokens, costUsd, requests, model, lastAt }
+let AGI = [] // $.agent.list()
 let justCompacted = false
 let handoffPending = false
 
@@ -265,8 +269,29 @@ let ctxCache = { at: 0, v: null }
 async function ctxState($) {
   if (!S.id || !home) return null
   if (Date.now() - ctxCache.at < 1500) return ctxCache.v
-  ctxCache = { at: Date.now(), v: await readJson($, home + '/.claude/ctx-state/' + S.id + '.json', null) }
-  return ctxCache.v
+  let v = await readJson($, home + '/.claude/ctx-state/' + S.id + '.json', null)
+  // No status line script running (VS Code): take model and context from the session itself
+  if (!v) {
+    if (!S.ctx || !S.window) {
+      try {
+        const u = await $.session.usage()
+        if (u.context && u.context.tokens) S.ctx = u.context.tokens
+        if (u.context && u.context.window) S.window = u.context.window
+      } catch {
+        // usage not available yet
+      }
+    }
+    const pct = S.ctx && S.window ? (100 * S.ctx) / S.window : null
+    if (S.model || pct != null) v = { model: prettyModel(S.model), pct }
+  }
+  ctxCache = { at: Date.now(), v }
+  return v
+}
+
+function prettyModel(id) {
+  const m = /claude-([a-z]+)-(\d+)(?:-(\d+))?/.exec(String(id || ''))
+  if (!m) return String(id || 'Claude')
+  return m[1][0].toUpperCase() + m[1].slice(1) + ' ' + m[2] + (m[3] ? '.' + m[3] : '')
 }
 
 function myHeartbeat() {
@@ -485,10 +510,17 @@ export function register(on) {
     names.keepwarm = (await registerCommand($, 'keepwarm', 'Keep this session\'s prompt cache warm (default 4 hours), or /keepwarm off', '[hours|off]', true)) || names.keepwarm
     names.board = (await registerCommand($, 'board', 'Every local Claude Code session: state, context, cache, cost', '', true)) || names.board
     names.handoff = (await registerCommand($, 'handoff', 'Session handoff, then clear this chat and continue with it (/handoff continue)', '[continue]')) || names.handoff
+    names.agents = (await registerCommand($, 'ck-agents', 'Agents in this session: status, context, cost', '', true)) || names.agents
     names.vault = (await registerCommand($, 'vault', 'Pick a Vault: switch the CLI to it, or log in to it', '', true)) || names.vault
     vaultStatus($).then(() => $.ui.invalidate('ui.render')).catch(() => {})
     $.clock.every(60000, () => vaultStatus($).then(() => $.ui.invalidate('ui.render')).catch(() => {}))
     $.clock.every(HEARTBEAT_EVERY, () => tick($).catch(() => {}))
+    // loading dots for the Vault picker: 0, 1, 2, 3 dots, again
+    $.clock.every(450, () => {
+      if (!V.busy) return
+      V.dots = (V.dots + 1) % 4
+      $.ui.invalidate('ui.render')
+    })
     await heartbeat($, true)
     return next(e)
   })
@@ -525,6 +557,9 @@ export function register(on) {
       H.path = ''
       $.ui.invalidate('ui.render')
     }
+    const typed = e.origin && e.origin.kind === 'composer' && !String(e.text || '').trim().startsWith('/')
+    const note = typed ? await vaultNote($).catch(() => '') : ''
+    if (note) e = { ...e, context: [...(e.context ?? []), note] }
     const ttl = ttlMin()
     const left = msLeft(S.lastActivity, ttl)
     const isCold = left !== null && left <= 0
@@ -566,6 +601,7 @@ export function register(on) {
   on('turn.step', async function* ($, e, next) {
     const startedAt = await $.clock.now()
     const result = yield* next(e)
+    if (e.agentId && result && result.usage) trackAgent($, e.agentId, result.usage)
     if (e.agentId || !result || !result.usage) return result
     now = await $.clock.now()
     const u = result.usage
@@ -598,7 +634,13 @@ export function register(on) {
 
   on('turn.complete', async ($, e, next) => {
     const r = await next(e)
-    if (e.agentId) return r
+    if (e.agentId) {
+      if (agentsOpen) {
+        await refreshAgents($)
+        $.ui.invalidate('ui.render')
+      }
+      return r
+    }
     now = await $.clock.now()
     S.working = false
     S.waitingSince = 0
@@ -720,6 +762,8 @@ export function register(on) {
 
   on('command.run', { command: ['board', 'ck-board'] }, async ($, e) => openBoard($))
 
+  on('command.run', { command: ['agents', 'ck-agents'] }, async ($, e, next) => openAgents($))
+
   on('command.run', { command: ['vault', 'ck-vault'] }, async ($, e) => {
     const text = await openVaultPicker($)
     return text ? { text } : {}
@@ -728,6 +772,7 @@ export function register(on) {
   on('ui.close', async ($, e, next) => {
     if (e.id === VPANE) V.open = false
     if (e.id === PANE) paneOpen = false
+    if (e.id === APANE) agentsOpen = false
     return next(e)
   })
 
@@ -778,8 +823,8 @@ export function register(on) {
     const handoff = Button({ key: 'handoff', label: handoffPending ? 'handoff queued' : H.armed ? 'handoff running' : 'handoff', hotkey: 'h', plain: true, dimColor: busy, onPress: () => runHandoff($) })
     // v opens the Vault picker; it reads "vault login" when the CLI has no valid session
     const vaultBtn = Button({ key: 'vault', label: V.valid ? 'vault' : 'vault login', hotkey: 'v', plain: true, dimColor: V.valid, onPress: async () => { const t = await openVaultPicker($); if (t) $.ui.toast(t, { timeoutMs: 15000 }) } })
-    // b opens the Sessions board (same as /board)
-    const boardBtn = Button({ key: 'board', label: 'board', hotkey: 'b', plain: true, dimColor: true, onPress: async () => { const r = await openBoard($); if (r && r.text) $.ui.toast(r.text, { timeoutMs: 15000 }) } })
+    // a opens the agents pane (same as /ck-agents)
+    const boardBtn = Button({ key: 'agents', label: 'agents', hotkey: 'a', plain: true, dimColor: true, onPress: async () => { const r = await openAgents($); if (r && r.text) $.ui.toast(r.text, { timeoutMs: 15000 }) } })
     let right = Box({ flexDirection: 'row', columnGap: 2, children: [boardBtn, vaultBtn, handoff] })
     if (H.text || H.continuing) {
       const go = Button({ key: 'continue', label: H.continuing ? 'clearing' : 'clear and continue', hotkey: 'c', plain: true, onPress: () => clearAndContinue($) })
@@ -791,6 +836,14 @@ export function register(on) {
 
   on('ui.render', { component: 'Pane' }, async ($, e, next) => {
     if (e.requestId === VPANE) return drawVaultPicker($, e)
+    if (e.requestId === APANE) {
+      try {
+        return drawAgents($, e)
+      } catch (err) {
+        const { Text } = $.ui.resolve(e)
+        return Text({ color: 'red', children: ['Agents pane failed: ' + String((err && err.message) || err)] })
+      }
+    }
     if (e.requestId !== PANE) return next(e)
     return drawBoard($, e)
   })
@@ -809,7 +862,7 @@ export function register(on) {
 // session is gone. The list is `vault list` (every Vault this login reaches);
 // without a session it falls back to the names cached by hooks/vault-track.py.
 const VPANE = 'vault-picker'
-const V = { list: [], current: '', valid: true, confirm: '', busy: '', msg: '', used: [], open: false }
+const V = { list: [], current: '', valid: true, confirm: '', busy: '', msg: '', used: [], open: false, filter: '', refreshing: false, pending: '', dots: 0 }
 // Same heuristic as the status line: anything not provably a sandbox counts as production.
 const SANDBOX_RE = /^sb-|sandbox|uat|sbx|template|demo|test|rebuild|-dev[.-]|sit-20/
 const isSandbox = (v) => SANDBOX_RE.test((v.dns + ' ' + v.name).toLowerCase())
@@ -841,11 +894,12 @@ async function vaultStatus($) {
 }
 
 async function vaultRefresh($) {
-  await vaultStatus($)
+  // status and list each take ~2s: run them side by side
+  const [, listRun] = await Promise.all([vaultStatus($), vrun($, ['list', '--format', 'json'])])
   const names = await readJson($, vdir() + '/names.json', {})
   let list = []
   if (V.valid) {
-    const r = await vrun($, ['list', '--format', 'json'])
+    const r = listRun
     try {
       list = JSON.parse(r.stdout).map((x) => ({ dns: String(x.dns).toLowerCase(), name: x.name }))
       for (const v of list) names[v.dns] = v.name
@@ -886,7 +940,8 @@ async function pickVault($, v) {
   }
   V.confirm = ''
   V.busy = shortName(v.name)
-  V.msg = V.valid ? `Switching to ${V.busy}…` : `Logging in to ${V.busy}: finish in the browser…`
+  V.dots = 0
+  V.msg = V.valid ? `Switching to ${V.busy}` : `Logging in to ${V.busy}: finish in the browser`
   $.ui.invalidate('ui.render')
   const r = V.valid ? await vrun($, ['switch', '--dns', v.dns, '-y']) : await vrun($, ['login', '--dns', v.dns, '-y'], 180000)
   now = await $.clock.now()
@@ -905,7 +960,8 @@ async function pickVault($, v) {
 async function loginPlain($) {
   // No Vault named: the CLI's own picker opens in the browser (first login ever)
   V.busy = 'login'
-  V.msg = 'Logging in: finish in the browser…'
+  V.dots = 0
+  V.msg = 'Logging in: finish in the browser'
   $.ui.invalidate('ui.render')
   const r = await vrun($, ['login', '-y'], 180000)
   now = await $.clock.now()
@@ -930,37 +986,58 @@ async function openBoard($) {
 async function openVaultPicker($) {
   now = await $.clock.now()
   const surface = await $.session.surface()
+  if (surface === 'vscode') {
+    V.confirm = ''
+    V.msg = ''
+    V.filter = ''
+    V.open = true
+    V.refreshing = true
+    await $.ui.open({ id: VPANE, title: 'Vaults', focus: true, closeOnEscape: true })
+    $.clock.after(20, () => vaultRefresh($).then(() => autoActivateCurrent($)).catch(() => {}).then(() => { V.refreshing = false; $.ui.invalidate('ui.render') }))
+    return ''
+  }
   await vaultRefresh($)
   if (!surface) {
     return V.list.map((v) => `${v.dns === V.current ? '▸' : ' '} ${isSandbox(v) ? '  ' : '⚠ '}${shortName(v.name)}  ${v.dns}`).join('\n') || 'No Vaults known. Run: vault login'
   }
   V.confirm = ''
   V.msg = ''
+  V.filter = ''
   V.open = true
   await $.ui.open({ id: VPANE, title: 'Vaults', focus: true, closeOnEscape: true })
   return ''
 }
 
 function drawVaultPicker($, e) {
-  const { Box, Text, Button } = $.ui.resolve(e)
-  const head = V.valid
-    ? Text({ dimColor: true, children: ['Signed in. Click a Vault to switch the CLI to it. ⚠ production asks twice.'] })
+  const { Box, Text, Button, Input } = $.ui.resolve(e)
+  const head = V.refreshing && e.surface === 'vscode'
+    ? Text({ dimColor: true, children: ['Checking Vault status…'] })
+    : V.valid
+    ? Text({ dimColor: true, children: [e.surface === 'vscode' ? 'Signed in. Activate every Vault you are working in. Claude switches the CLI between them itself. ⚠ production asks twice.' : 'Signed in. Click a Vault to switch the CLI to it. ⚠ production asks twice.'] })
     : Text({ color: 'red', children: ['Not signed in. Click a Vault to log in to it (opens your browser).'] })
-  const rows = V.list.map((v) => {
+  const vs = e.surface === 'vscode'
+  const q = V.filter.trim().toLowerCase()
+  const shown = q ? V.list.filter((v) => (v.name + ' ' + v.dns).toLowerCase().includes(q)) : V.list
+  const rows = shown.map((v) => {
     const sb = isSandbox(v)
     const confirm = V.confirm === v.dns
-    const label = (v.dns === V.current ? '▸ ' : '  ') + (confirm ? 'press again to confirm: ' : '') + shortName(v.name)
+    const label = '  ' + (confirm ? 'press again to confirm: ' : '') + shortName(v.name)
     // Vaults used in this chat are coloured (green sandbox, yellow production); the CLI's current one is also bold. The tag stays dim.
     const used = V.used.includes(v.dns)
     const rest = `  ${sb ? 'sandbox' : '⚠ production'}${used ? '  · used in this chat' : ''}`
     const col = sb ? 'green' : 'yellow'
-    const tone = !V.valid ? {} : v.dns === V.current ? { color: col, bold: true } : used ? { color: col } : {}
+    const tone = !V.valid ? {} : used ? { color: col } : {}
+    if (vs) return vscodeVaultRow($, { Box, Text, Button }, v, { sb, used, confirm, col })
     const props = { key: 'v-' + v.dns, label: label + rest, children: [Text({ ...tone, children: [label] }), Text({ dimColor: true, children: [rest] })], plain: true, dimColor: !!V.busy, onPress: () => (V.busy ? undefined : pickVault($, v)) }
     return Button(props)
   })
-  const children = [head, Box({ flexDirection: 'column', children: rows.length ? rows : [Text({ dimColor: true, children: ['No Vaults known yet. Use "log in" below.'] })] })]
-  children.push(Button({ key: 'v-login', label: V.valid ? 'log in again (browser)' : 'log in (browser picks the Vault)', hotkey: 'l', plain: true, dimColor: !!V.busy, onPress: () => (V.busy ? undefined : loginPlain($)) }))
-  if (V.msg) children.push(Text({ color: V.msg.startsWith('Failed') ? 'red' : undefined, dimColor: !V.msg.startsWith('Failed'), children: [V.msg] }))
+  const empty = V.refreshing ? 'Loading Vaults…' : q ? `No Vault matches "${V.filter.trim()}".` : 'No Vaults known yet. Use "log in" below.'
+  const children = [head]
+  children.push(Input({ key: 'v-search', placeholder: 'Search Vaults…', value: V.filter, submitLabel: 'search', onInput: (val) => { V.filter = val; V.confirm = ''; $.ui.invalidate('ui.render') }, onSubmit: () => {} }))
+  children.push(Box({ flexDirection: 'column', children: rows.length ? rows : [Text({ dimColor: true, children: [empty] })] }))
+  // On VS Code the login button only shows while signed out
+  if (!(vs && V.valid)) children.push(Button({ key: 'v-login', label: V.valid ? 'log in again (browser)' : 'log in (browser picks the Vault)', plain: true, dimColor: !!V.busy, onPress: () => (V.busy ? undefined : loginPlain($)) }))
+  if (V.msg) children.push(Text({ color: V.msg.startsWith('Failed') ? 'red' : undefined, dimColor: !V.msg.startsWith('Failed'), children: [V.msg + (V.busy ? '.'.repeat(V.dots) : '')] }))
   return Box({ flexDirection: 'column', rowGap: 1, children })
 }
 
@@ -1079,4 +1156,203 @@ function drawBoard($, e) {
     children: [`${list.length} session${list.length === 1 ? '' : 's'} · ${money(totalCost)} total · ${waiting} waiting on you · cold restarts ${money(totalCold)} · keep warm reads the cache before it expires · Esc closes`],
   })
   return Box({ flexDirection: 'column', children: [header, ...rows, Text({ children: [' '] }), footer] })
+}
+
+// ---- VS Code layout for the Vault picker: one card per Vault (name and badges
+// left, a single native button right) instead of a column of full-width chips.
+function vscodeVaultRow($, el, v, { sb, used, confirm, col }) {
+  const { Box, Text, Button } = el
+  const cur = v.dns === V.current && V.valid
+  const on = V.valid && used
+  const pending = V.pending === v.dns
+  const name = Text({ bold: on, color: on ? col : undefined, children: [shortName(v.name)] })
+  const badges = [Text({ color: sb ? 'green' : 'yellow', dimColor: !V.valid, children: [sb ? 'sandbox' : '⚠ production'] })]
+  if (on) badges.push(Text({ color: 'green', children: ['● active'] }))
+  if (cur) badges.push(Text({ dimColor: true, children: ['CLI here'] }))
+  const busy = () => !!V.busy || !!V.pending
+  const btn = (key, label, onPress, variant) => Button({ key: key + v.dns, label: pending ? (on ? 'Deactivating…' : 'Activating…') : label, variant, dimColor: busy(), onPress: () => (busy() ? undefined : onPress()) })
+  const actions = []
+  if (!V.valid) actions.push(btn('v-', 'Log in', () => pickVault($, v)))
+  else {
+    if (on) actions.push(btn('v-off-', 'Deactivate', () => deactivateVault($, v)))
+    else actions.push(btn('v-', confirm ? 'Confirm activate' : 'Activate', () => activateVault($, v), confirm ? 'primary' : undefined))
+  }
+  return Box({
+    key: 'vrow-' + v.dns,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderStyle: 'round',
+    borderColor: on ? 'green' : 'gray',
+    paddingX: 1,
+    children: [Box({ flexDirection: 'column', children: [name, Box({ flexDirection: 'row', columnGap: 2, children: badges })] }), Box({ flexDirection: 'row', columnGap: 1, children: actions })],
+  })
+}
+
+// Mark a Vault active in this chat. The CLI is not touched: Claude switches between active Vaults itself.
+async function activateVault($, v) {
+  if (!isSandbox(v) && V.confirm !== v.dns) {
+    V.confirm = v.dns
+    $.ui.invalidate('ui.render')
+    return
+  }
+  V.confirm = ''
+  V.pending = v.dns
+  $.ui.invalidate('ui.render')
+  now = await $.clock.now()
+  dismissed.delete(v.dns)
+  const path = vdir() + '/' + S.id + '.json'
+  const used = (await readJson($, path, [])).filter((u) => u.dns !== v.dns)
+  used.push({ dns: v.dns, name: v.name, ts: Math.round(now / 1000), cli: false })
+  try {
+    await $.fs.write(path, JSON.stringify(used.slice(-6)))
+  } catch {
+    V.msg = 'Failed: could not save the active list.'
+  }
+  await vaultRefresh($).catch(() => {})
+  V.pending = ''
+  $.ui.invalidate('ui.render')
+}
+
+// Take a Vault out of this chat's active set (the hook adds it back if a command uses it again)
+// The Vault the CLI is signed in to counts as active when the picker opens
+// (unless the user deactivated it earlier in this session)
+const dismissed = new Set()
+async function autoActivateCurrent($) {
+  if (!V.valid || !V.current || V.used.includes(V.current) || dismissed.has(V.current)) return
+  const v = V.list.find((x) => x.dns === V.current)
+  if (!v) return
+  now = await $.clock.now()
+  const path = vdir() + '/' + S.id + '.json'
+  const used = (await readJson($, path, [])).filter((u) => u.dns !== v.dns)
+  used.push({ dns: v.dns, name: v.name, ts: Math.round(now / 1000), cli: true })
+  try {
+    await $.fs.write(path, JSON.stringify(used.slice(-6)))
+  } catch {
+    return
+  }
+  V.used = [...V.used, v.dns]
+}
+
+async function deactivateVault($, v) {
+  dismissed.add(v.dns)
+  V.pending = v.dns
+  $.ui.invalidate('ui.render')
+  const path = vdir() + '/' + S.id + '.json'
+  const left = (await readJson($, path, [])).filter((u) => u.dns !== v.dns)
+  try {
+    await $.fs.write(path, JSON.stringify(left))
+  } catch {
+    // nothing to remove if it cannot be written
+  }
+  await vaultRefresh($).catch(() => {})
+  V.pending = ''
+  $.ui.invalidate('ui.render')
+}
+
+// With two or more active Vaults, tell Claude, since the CLI can only point at one
+async function vaultNote($) {
+  const used = await readJson($, vdir() + '/' + S.id + '.json', [])
+  if (used.length < 2) return ''
+  let cur = ''
+  try {
+    cur = V.current || ''
+  } catch {
+    // unknown
+  }
+  const list = used.map((u) => `${shortName(u.name)} (${u.dns})${u.dns === cur ? ' [CLI now here]' : ''}${isSandbox(u) ? '' : ' [production]'}`).join('; ')
+  return `Vaults the user marked active in this chat: ${list}. The Vault CLI points at one Vault at a time: before a vault query/api/mdl/config command for another active Vault, run \`vault switch --dns <dns> -y\` and check \`vault status\`. Never switch to or write in a [production] Vault unless the user asked.`
+}
+
+// ---- Agents: the subagents of this session, their status, context and cost.
+// Cost and context come from each agent loop's own requests (turn.step carries
+// the agent id), so they cover what the agent has run so far.
+function trackAgent($, id, u) {
+  const model = u.model || S.model
+  const a = AG.get(id) || { tokens: 0, costUsd: 0, requests: 0, model: '', lastAt: 0 }
+  a.tokens = totalInput(u)
+  a.costUsd += requestCost(u, model, ttlMin())
+  a.requests += 1
+  a.model = model
+  a.lastAt = now
+  AG.set(id, a)
+  if (agentsOpen) $.ui.invalidate('ui.render')
+}
+
+async function refreshAgents($) {
+  try {
+    AGI = await $.agent.list()
+  } catch {
+    // keep the last list
+  }
+}
+
+function agentRows() {
+  const ids = new Set([...AGI.map((a) => a.id), ...AG.keys()])
+  const rank = { running: 0, idle: 1 }
+  return [...ids]
+    .map((id) => {
+      const info = AGI.find((a) => a.id === id) || {}
+      const m = AG.get(id) || { tokens: 0, costUsd: 0, requests: 0, model: '' }
+      return { id, status: info.status || 'done', title: info.description || info.name || id.slice(0, 8), type: info.type || '', ...m }
+    })
+    .sort((a, b) => (rank[a.status] ?? 2) - (rank[b.status] ?? 2) || b.costUsd - a.costUsd)
+}
+
+function agentCtx(a) {
+  const w = S.window || 200000
+  return a.tokens ? `${tokens(a.tokens)} (${Math.round((100 * a.tokens) / w)}%)` : '–'
+}
+
+function agentsText() {
+  const rows = agentRows()
+  if (!rows.length) return 'No agents in this session yet.'
+  return ['Agents in this session:', ...rows.map((a) => `${pad(a.status, 8)} ${pad(clip(mask(a.title), 36), 37)} ${pad(a.type, 16)} ctx ${pad(agentCtx(a), 12)} ${money(a.costUsd)}`)].join('\n')
+}
+
+async function openAgents($) {
+  now = await $.clock.now()
+  await refreshAgents($)
+  const surface = await $.session.surface()
+  if (!surface) return { text: agentsText() }
+  agentsOpen = true
+  await $.ui.open({ id: APANE, title: 'Agents', focus: true, closeOnEscape: true })
+  return {}
+}
+
+function drawAgents($, e) {
+  const { Box, Text, Button } = $.ui.resolve(e)
+  const vs = e.surface === 'vscode'
+  const rows = agentRows()
+  const running = rows.filter((a) => a.status === 'running').length
+  const total = rows.reduce((t, a) => t + a.costUsd, 0)
+  const head = Box({
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    children: [
+      Text({ dimColor: true, children: [`${rows.length} agent${rows.length === 1 ? '' : 's'} · ${running} running · ${money(total)} total · context vs ${tokens(S.window || 200000)} window`] }),
+      Button({ key: 'ag-refresh', label: 'Refresh', ...(vs ? {} : { plain: true, dimColor: true }), onPress: async () => { await refreshAgents($); $.ui.invalidate('ui.render') } }),
+    ],
+  })
+  if (!rows.length) return Box({ flexDirection: 'column', rowGap: 1, children: [head, Text({ dimColor: true, children: ['No agents in this session yet. They show up here when Claude starts one.'] })] })
+  const cards = rows.map((a) => {
+    const pct = a.tokens ? Math.round((100 * a.tokens) / (S.window || 200000)) : 0
+    const f = Math.max(0, Math.min(10, Math.round(pct / 10)))
+    const dot = a.status === 'running' ? ['● running', 'cyan'] : a.status === 'idle' ? ['○ idle', undefined] : ['✓ done', 'green']
+    const ctxColor = pct < 50 ? 'green' : pct < 75 ? 'yellow' : 'red'
+    const line1 = Box({ flexDirection: 'row', columnGap: 2, children: [Text({ bold: true, children: [clip(mask(a.title), 48)] }), Text({ color: dot[1], dimColor: !dot[1], children: [dot[0]] }), ...(a.type ? [Text({ dimColor: true, children: [a.type] })] : [])] })
+    const line2 = Box({
+      flexDirection: 'row',
+      columnGap: 2,
+      children: [
+        Text({ color: a.tokens ? ctxColor : undefined, dimColor: !a.tokens, children: [`ctx [${'#'.repeat(f)}${'-'.repeat(10 - f)}] ${agentCtx(a)}`] }),
+        Text({ children: [money(a.costUsd)] }),
+        Text({ dimColor: true, children: [`${a.requests} request${a.requests === 1 ? '' : 's'}${a.model ? ' · ' + a.model : ''}`] }),
+      ],
+    })
+    const props = { key: 'agent-' + a.id, flexDirection: 'column', children: [line1, line2] }
+    return Box(vs ? { ...props, borderStyle: 'round', borderColor: 'gray', paddingX: 1 } : props)
+  })
+  return Box({ flexDirection: 'column', rowGap: 1, children: [head, ...cards] })
 }

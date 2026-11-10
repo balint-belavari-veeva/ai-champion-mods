@@ -437,7 +437,8 @@ export function register(on) {
   on('ui.render', { component: 'Pane' }, async ($, e, next) => {
     if (e.requestId !== PANE) return next(e)
     const el = $.ui.resolve(e)
-    const width = Math.max(50, (e.props && e.props.bodyColumns) || 100)
+    // VS Code's side panel is narrow: a 50+ column minimum (and a bar up to 120) overflows it sideways
+    const width = e.surface === 'vscode' ? 36 : Math.max(50, (e.props && e.props.bodyColumns) || 100)
     return drawPane(el, width)
   })
 }
