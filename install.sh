@@ -25,6 +25,14 @@ if [ "$1" != "--no-statusline" ]; then
     jq '.statusLine = {"type":"command","command":"bash ~/.claude/statusline-command.sh"}' "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
     echo "status line enabled in settings.json"
   fi
+  # Per-chat Vault tracking: PostToolUse hook records which Vaults each chat uses
+  mkdir -p "$HOME/.claude/hooks"
+  cp "$HERE/hooks/vault-track.py" "$HOME/.claude/hooks/vault-track.py"
+  if ! jq -e '[.hooks.PostToolUse[]?.hooks[]?.command] | any(test("vault-track.py"))' "$SETTINGS" >/dev/null 2>&1; then
+    tmp="$(mktemp)"
+    jq '.hooks.PostToolUse = ((.hooks.PostToolUse // []) + [{"matcher":"Bash","hooks":[{"type":"command","command":"python3 -I ~/.claude/hooks/vault-track.py"}]}])' "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
+    echo "vault tracking hook enabled in settings.json"
+  fi
 fi
 
 # Remove Nate Herk's originals if present (same commands would clash)
