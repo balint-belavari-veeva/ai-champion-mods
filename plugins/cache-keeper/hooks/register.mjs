@@ -925,7 +925,7 @@ function drawVaultPicker($, e) {
   const head = V.valid
     ? Text({ dimColor: true, children: ['Signed in. Click a Vault to switch the CLI to it. ⚠ production asks twice.'] })
     : Text({ color: 'red', children: ['Not signed in. Click a Vault to log in to it (opens your browser).'] })
-  const rows = V.list.map((v, i) => {
+  const rows = V.list.map((v) => {
     const sb = isSandbox(v)
     const confirm = V.confirm === v.dns
     const label = (v.dns === V.current ? '▸ ' : '  ') + (confirm ? 'press again to confirm: ' : '') + shortName(v.name)
@@ -933,7 +933,6 @@ function drawVaultPicker($, e) {
     const rest = `  ${sb ? 'sandbox' : '⚠ production'}${V.used.includes(v.dns) ? '  · used in this chat' : ''}`
     const tone = V.valid ? (sb ? { color: 'green' } : { color: 'yellow', bold: true }) : {}
     const props = { key: 'v-' + v.dns, label: label + rest, children: [Text({ ...tone, children: [label] }), Text({ dimColor: true, children: [rest] })], plain: true, dimColor: !!V.busy, onPress: () => (V.busy ? undefined : pickVault($, v)) }
-    if (i < 9) props.hotkey = String(i + 1)
     return Button(props)
   })
   const children = [head, Box({ flexDirection: 'column', children: rows.length ? rows : [Text({ dimColor: true, children: ['No Vaults known yet. Use "log in" below.'] })] })]
