@@ -752,14 +752,17 @@ export function register(on) {
     if (st.kind === 'unknown') parts.unshift(Text({ dimColor: true, children: ['○ cache unknown until next message'] }))
     parts.push(Text({ dimColor: true, children: [S.costUsd ? ` │ session ${money(S.costUsd)}` : ' │ session –'] }))
     if (S.coldRestarts.length) parts.push(Text({ dimColor: true, children: [` │ ${S.coldRestarts.length} cold restart${S.coldRestarts.length === 1 ? '' : 's'} ${money(S.coldRestarts.reduce((a, c) => a + c.usd, 0))}`] }))
+    // Model + context bar lead the row, before the cache state
     const cx = await ctxState($)
     if (cx) {
       const pct = cx.pct == null ? null : Math.round(cx.pct)
-      parts.push(Text({ dimColor: true, children: [` │ ${cx.model}`] }))
+      const lead = [Text({ dimColor: true, children: [cx.model] })]
       if (pct != null) {
         const f = Math.max(0, Math.min(10, Math.round(pct / 10)))
-        parts.push(Text({ color: pct < 20 ? 'green' : pct < 25 ? 'yellow' : 'red', children: [` [${'#'.repeat(f)}${'-'.repeat(10 - f)}] ${pct}% ctx`] }))
+        lead.push(Text({ color: pct < 20 ? 'green' : pct < 25 ? 'yellow' : 'red', children: [` [${'#'.repeat(f)}${'-'.repeat(10 - f)}] ${pct}% ctx`] }))
       }
+      lead.push(Text({ dimColor: true, children: [' │ '] }))
+      parts.unshift(...lead)
     }
     const row = [Box({ flexDirection: 'row', children: parts })]
     if (st.kind === 'cooling' && big) {
@@ -947,9 +950,11 @@ function drawVaultPicker($, e) {
     const sb = isSandbox(v)
     const confirm = V.confirm === v.dns
     const label = (v.dns === V.current ? '▸ ' : '  ') + (confirm ? 'press again to confirm: ' : '') + shortName(v.name)
-    // Only the active Vault (the CLI's current one) is coloured: green sandbox, yellow production. The tag stays dim.
-    const rest = `  ${sb ? 'sandbox' : '⚠ production'}${V.used.includes(v.dns) ? '  · used in this chat' : ''}`
-    const tone = V.valid && v.dns === V.current ? (sb ? { color: 'green', bold: true } : { color: 'yellow', bold: true }) : {}
+    // Vaults used in this chat are coloured (green sandbox, yellow production); the CLI's current one is also bold. The tag stays dim.
+    const used = V.used.includes(v.dns)
+    const rest = `  ${sb ? 'sandbox' : '⚠ production'}${used ? '  · used in this chat' : ''}`
+    const col = sb ? 'green' : 'yellow'
+    const tone = !V.valid ? {} : v.dns === V.current ? { color: col, bold: true } : used ? { color: col } : {}
     const props = { key: 'v-' + v.dns, label: label + rest, children: [Text({ ...tone, children: [label] }), Text({ dimColor: true, children: [rest] })], plain: true, dimColor: !!V.busy, onPress: () => (V.busy ? undefined : pickVault($, v)) }
     return Button(props)
   })
