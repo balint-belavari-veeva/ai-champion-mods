@@ -726,7 +726,6 @@ export function register(on) {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const below = await next(e)
     if (e.props && e.props.hasSurvey) return below
-    if (!S.lastActivity && !S.keepWarm) return below
     const { Box, Text, Button } = $.ui.resolve(e)
     const hb = myHeartbeat()
     const st = cacheState(hb)
@@ -738,9 +737,11 @@ export function register(on) {
     else if (st.kind === 'cooling') parts.push(Text({ color: 'yellow', bold: true, children: [`◐ cache cools in ${minutes(st.left)}`] }))
     else if (st.kind === 'cold') parts.push(Text(big ? { color: 'red', bold: true, children: [`○ cache cold ${minutes(-st.left)}`] } : { dimColor: true, children: [`○ cache cold ${minutes(-st.left)}`] }))
     if (st.kind === 'cold' && big) parts.push(Text({ color: 'red', children: [` │ next send rewrites it ≈ ${money(rewriteCost(S.ctx, S.model, ttl))}`] }))
-    else parts.push(Text({ dimColor: true, children: [` │ rewrite ≈ ${money(rewriteCost(S.ctx, S.model, ttl))}`] }))
+    else if (st.kind !== 'unknown') parts.push(Text({ dimColor: true, children: [` │ rewrite ≈ ${money(rewriteCost(S.ctx, S.model, ttl))}`] }))
     if (S.rateLimits.length) parts.push(Text(limitTone(S.rateLimits, { children: [' │ ' + limitsText(S.rateLimits)] })))
-    parts.push(Text({ dimColor: true, children: [` │ session ${money(S.costUsd)}`] }))
+    // A resumed chat has no activity yet: show placeholders, keep the buttons
+    if (st.kind === 'unknown') parts.unshift(Text({ dimColor: true, children: ['○ cache unknown until next message'] }))
+    parts.push(Text({ dimColor: true, children: [S.costUsd ? ` │ session ${money(S.costUsd)}` : ' │ session –'] }))
     if (S.coldRestarts.length) parts.push(Text({ dimColor: true, children: [` │ ${S.coldRestarts.length} cold restart${S.coldRestarts.length === 1 ? '' : 's'} ${money(S.coldRestarts.reduce((a, c) => a + c.usd, 0))}`] }))
     const row = [Box({ flexDirection: 'row', children: parts })]
     if (st.kind === 'cooling' && big) {
