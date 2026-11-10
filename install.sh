@@ -44,7 +44,9 @@ claude plugin marketplace add "$HERE" >/dev/null 2>&1 || true
 # Always refresh: re-adding an existing marketplace does not re-read it, so updates would silently stay on the old version
 claude plugin marketplace update ai-champion-mods >/dev/null 2>&1 || true
 for m in $MODS; do
-  claude plugin install "$m@ai-champion-mods" >/dev/null 2>&1 || claude plugin update "$m@ai-champion-mods"
+  # install is a silent no-op when already installed, so always follow with update (the one that applies a new version)
+  claude plugin install "$m@ai-champion-mods" >/dev/null 2>&1 || true
+  claude plugin update "$m@ai-champion-mods" >/dev/null 2>&1 || true
   echo "installed $m"
 done
 echo "Done. Open a new Claude Code chat to load the mods."
