@@ -709,16 +709,7 @@ export function register(on) {
     return {}
   })
 
-  on('command.run', { command: ['board', 'ck-board'] }, async ($, e) => {
-    now = await $.clock.now()
-    await heartbeat($, true)
-    await readFleet($)
-    const surface = await $.session.surface()
-    if (!surface) return { text: boardText() }
-    paneOpen = true
-    await $.ui.open({ id: PANE, title: 'Sessions', focus: true, closeOnEscape: true })
-    return {}
-  })
+  on('command.run', { command: ['board', 'ck-board'] }, async ($, e) => openBoard($))
 
   on('command.run', { command: ['vault', 'ck-vault'] }, async ($, e) => {
     const text = await openVaultPicker($)
@@ -766,10 +757,12 @@ export function register(on) {
     const handoff = Button({ key: 'handoff', label: handoffPending ? 'handoff queued' : H.armed ? 'handoff running' : 'handoff', hotkey: 'h', plain: true, dimColor: busy, onPress: () => runHandoff($) })
     // v opens the Vault picker; it reads "vault login" when the CLI has no valid session
     const vaultBtn = Button({ key: 'vault', label: V.valid ? 'vault' : 'vault login', hotkey: 'v', plain: true, dimColor: V.valid, onPress: async () => { const t = await openVaultPicker($); if (t) $.ui.toast(t, { timeoutMs: 15000 }) } })
-    let right = Box({ flexDirection: 'row', columnGap: 2, children: [vaultBtn, handoff] })
+    // b opens the Sessions board (same as /board)
+    const boardBtn = Button({ key: 'board', label: 'board', hotkey: 'b', plain: true, dimColor: true, onPress: async () => { const r = await openBoard($); if (r && r.text) $.ui.toast(r.text, { timeoutMs: 15000 }) } })
+    let right = Box({ flexDirection: 'row', columnGap: 2, children: [boardBtn, vaultBtn, handoff] })
     if (H.text || H.continuing) {
       const go = Button({ key: 'continue', label: H.continuing ? 'clearing' : 'clear and continue', hotkey: 'c', plain: true, onPress: () => clearAndContinue($) })
-      right = Box({ flexDirection: 'row', columnGap: 2, children: [go, vaultBtn, handoff] })
+      right = Box({ flexDirection: 'row', columnGap: 2, children: [go, boardBtn, vaultBtn, handoff] })
     }
     const mine = Box({ flexDirection: 'row', justifyContent: 'space-between', width: '100%', columnGap: 2, children: [left, right] })
     return Box({ flexDirection: 'column', children: below ? [mine, below] : [mine] })
@@ -863,7 +856,7 @@ async function recordUsed($, v) {
 }
 
 async function pickVault($, v) {
-  // Production (not provably a sandbox) needs a second press
+  // Production needs a second press
   if (!isSandbox(v) && V.confirm !== v.dns) {
     V.confirm = v.dns
     V.msg = ''
@@ -901,6 +894,18 @@ async function loginPlain($) {
   $.ui.invalidate('ui.render')
 }
 
+// The Sessions board: the /board command and the band's board button.
+async function openBoard($) {
+  now = await $.clock.now()
+  await heartbeat($, true)
+  await readFleet($)
+  const surface = await $.session.surface()
+  if (!surface) return { text: boardText() }
+  paneOpen = true
+  await $.ui.open({ id: PANE, title: 'Sessions', focus: true, closeOnEscape: true })
+  return {}
+}
+
 async function openVaultPicker($) {
   now = await $.clock.now()
   const surface = await $.session.surface()
@@ -918,17 +923,18 @@ async function openVaultPicker($) {
 function drawVaultPicker($, e) {
   const { Box, Text, Button } = $.ui.resolve(e)
   const head = V.valid
-    ? Text({ dimColor: true, children: ['Signed in. Click a Vault to switch the CLI to it. ⚠ asks twice.'] })
+    ? Text({ dimColor: true, children: ['Signed in. Click a Vault to switch the CLI to it. ⚠ production asks twice.'] })
     : Text({ color: 'red', children: ['Not signed in. Click a Vault to log in to it (opens your browser).'] })
   const rows = V.list.map((v, i) => {
     const sb = isSandbox(v)
     const confirm = V.confirm === v.dns
     const label = (v.dns === V.current ? '▸ ' : '  ') + (confirm ? 'press again to confirm: ' : '') + shortName(v.name)
-    const tag = sb ? Text({ color: 'green', children: ['sandbox'] }) : Text({ color: 'yellow', bold: true, children: ['⚠ not a sandbox'] })
-    const extra = V.used.includes(v.dns) ? Text({ dimColor: true, children: ['used in this chat'] }) : Text({ children: [''] })
-    const props = { key: 'v-' + v.dns, label, plain: true, dimColor: !!V.busy, onPress: () => (V.busy ? undefined : pickVault($, v)) }
+    // Signed in: the whole row is green (sandbox) or yellow (production). Signed out: plain.
+    const text = `${label}  ${sb ? 'sandbox' : '⚠ production'}${V.used.includes(v.dns) ? '  · used in this chat' : ''}`
+    const tone = V.valid ? (sb ? { color: 'green' } : { color: 'yellow', bold: true }) : {}
+    const props = { key: 'v-' + v.dns, label: text, children: [Text({ ...tone, children: [text] })], plain: true, dimColor: !!V.busy, onPress: () => (V.busy ? undefined : pickVault($, v)) }
     if (i < 9) props.hotkey = String(i + 1)
-    return Box({ flexDirection: 'row', columnGap: 2, children: [Button(props), tag, extra] })
+    return Button(props)
   })
   const children = [head, Box({ flexDirection: 'column', children: rows.length ? rows : [Text({ dimColor: true, children: ['No Vaults known yet. Use "log in" below.'] })] })]
   children.push(Button({ key: 'v-login', label: V.valid ? 'log in again (browser)' : 'log in (browser picks the Vault)', hotkey: 'l', plain: true, dimColor: !!V.busy, onPress: () => (V.busy ? undefined : loginPlain($)) }))
