@@ -28,3 +28,7 @@ The engine allows one hooks module per plugin and refuses two modules that hook 
 ## Changes from Nate Herk's originals
 
 See `CHANGES.md`. Based on Nate Herk's Claude Code mods, MIT licence, see `LICENSE`.
+
+## Vault picker
+
+The band's `vault` button (or `/vault`) lists the Vaults your login reaches. Click one to switch to it; if the session expired the same click logs you in to it (browser). Amber ⚠ Vaults (not provably a sandbox) ask for a second press. First login ever: press `l` (log in) and the CLI's browser picker takes over.

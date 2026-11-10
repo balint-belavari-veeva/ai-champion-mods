@@ -46,7 +46,7 @@ const S = {
 }
 
 const settings = { bigTokens: 150000, guard: true, ttlMin: 0, alerts: true, keepWarmHours: 4 }
-const names = { cache: 'cache', keepwarm: 'keepwarm', board: 'board', handoff: 'handoff' }
+const names = { cache: 'cache', keepwarm: 'keepwarm', board: 'board', handoff: 'handoff', vault: 'vault' }
 
 let now = 0
 let home = ''
@@ -476,6 +476,9 @@ export function register(on) {
     names.keepwarm = (await registerCommand($, 'keepwarm', 'Keep this session\'s prompt cache warm (default 4 hours), or /keepwarm off', '[hours|off]', true)) || names.keepwarm
     names.board = (await registerCommand($, 'board', 'Every local Claude Code session: state, context, cache, cost', '', true)) || names.board
     names.handoff = (await registerCommand($, 'handoff', 'Session handoff, then clear this chat and continue with it (/handoff continue)', '[continue]')) || names.handoff
+    names.vault = (await registerCommand($, 'vault', 'Pick a Vault: switch the CLI to it, or log in to it', '', true)) || names.vault
+    vaultStatus($).then(() => $.ui.invalidate('ui.render')).catch(() => {})
+    $.clock.every(60000, () => vaultStatus($).then(() => $.ui.invalidate('ui.render')).catch(() => {}))
     $.clock.every(HEARTBEAT_EVERY, () => tick($).catch(() => {}))
     await heartbeat($, true)
     return next(e)
@@ -717,7 +720,13 @@ export function register(on) {
     return {}
   })
 
+  on('command.run', { command: ['vault', 'ck-vault'] }, async ($, e) => {
+    const text = await openVaultPicker($)
+    return text ? { text } : {}
+  })
+
   on('ui.close', async ($, e, next) => {
+    if (e.id === VPANE) V.open = false
     if (e.id === PANE) paneOpen = false
     return next(e)
   })
@@ -755,16 +764,19 @@ export function register(on) {
     // is in, c clears this chat and sends it as the fresh chat's first prompt.
     const busy = handoffPending || H.armed
     const handoff = Button({ key: 'handoff', label: handoffPending ? 'handoff queued' : H.armed ? 'handoff running' : 'handoff', hotkey: 'h', plain: true, dimColor: busy, onPress: () => runHandoff($) })
-    let right = handoff
+    // v opens the Vault picker; it reads "vault login" when the CLI has no valid session
+    const vaultBtn = Button({ key: 'vault', label: V.valid ? 'vault' : 'vault login', hotkey: 'v', plain: true, dimColor: V.valid, onPress: async () => { const t = await openVaultPicker($); if (t) $.ui.toast(t, { timeoutMs: 15000 }) } })
+    let right = Box({ flexDirection: 'row', columnGap: 2, children: [vaultBtn, handoff] })
     if (H.text || H.continuing) {
       const go = Button({ key: 'continue', label: H.continuing ? 'clearing' : 'clear and continue', hotkey: 'c', plain: true, onPress: () => clearAndContinue($) })
-      right = Box({ flexDirection: 'row', columnGap: 2, children: [go, handoff] })
+      right = Box({ flexDirection: 'row', columnGap: 2, children: [go, vaultBtn, handoff] })
     }
     const mine = Box({ flexDirection: 'row', justifyContent: 'space-between', width: '100%', columnGap: 2, children: [left, right] })
     return Box({ flexDirection: 'column', children: below ? [mine, below] : [mine] })
   })
 
   on('ui.render', { component: 'Pane' }, async ($, e, next) => {
+    if (e.requestId === VPANE) return drawVaultPicker($, e)
     if (e.requestId !== PANE) return next(e)
     return drawBoard($, e)
   })
@@ -777,6 +789,151 @@ export function register(on) {
     const modes = Array.isArray(e.props && e.props.modes) ? e.props.modes : []
     return next({ ...e, props: { ...e.props, modes: [...modes, label] } })
   })
+}
+
+// ---- Vault picker: click a Vault to switch to it, or to log in to it when the
+// session is gone. The list is `vault list` (every Vault this login reaches);
+// without a session it falls back to the names cached by hooks/vault-track.py.
+const VPANE = 'vault-picker'
+const V = { list: [], current: '', valid: true, confirm: '', busy: '', msg: '', used: [], open: false }
+// Same heuristic as the status line: anything not provably a sandbox counts as production.
+const SANDBOX_RE = /^sb-|sandbox|uat|sbx|template|demo|test|rebuild|-dev[.-]|sit-20/
+const isSandbox = (v) => SANDBOX_RE.test((v.dns + ' ' + v.name).toLowerCase())
+const shortName = (n) => String(n || '').replace(/ \([^)]*\)$/, '')
+const vdir = () => home + '/.claude/vault-sessions'
+
+async function vrun($, args, timeoutMs = 20000) {
+  try {
+    return await $.process.run(['vault', ...args], { timeoutMs })
+  } catch (err) {
+    return { exitCode: 1, stdout: '', stderr: String((err && err.message) || err) }
+  }
+}
+
+async function readJson($, path, fallback) {
+  try {
+    return JSON.parse(await $.fs.read(path))
+  } catch {
+    return fallback
+  }
+}
+
+async function vaultStatus($) {
+  const st = await vrun($, ['status'])
+  const out = st.stdout || ''
+  V.valid = st.exitCode === 0 && /^Auth:.*valid/im.test(out) && !/expired|invalid/i.test(out)
+  const m = /^DNS:\s*(\S+)/m.exec(out)
+  V.current = m ? m[1].toLowerCase() : ''
+}
+
+async function vaultRefresh($) {
+  await vaultStatus($)
+  const names = await readJson($, vdir() + '/names.json', {})
+  let list = []
+  if (V.valid) {
+    const r = await vrun($, ['list', '--format', 'json'])
+    try {
+      list = JSON.parse(r.stdout).map((x) => ({ dns: String(x.dns).toLowerCase(), name: x.name }))
+      for (const v of list) names[v.dns] = v.name
+      try {
+        await $.fs.write(vdir() + '/names.json', JSON.stringify(names))
+      } catch {
+        // cache is optional
+      }
+    } catch {
+      list = []
+    }
+  }
+  if (!list.length) list = Object.entries(names).map(([dns, name]) => ({ dns, name }))
+  const used = await readJson($, vdir() + '/' + S.id + '.json', [])
+  V.used = used.map((u) => u.dns)
+  // this chat's Vaults first, then the rest by name
+  V.list = list.sort((a, b) => (V.used.includes(b.dns) ? 1 : 0) - (V.used.includes(a.dns) ? 1 : 0) || String(a.name).localeCompare(String(b.name)))
+}
+
+async function recordUsed($, v) {
+  const path = vdir() + '/' + S.id + '.json'
+  const used = (await readJson($, path, [])).filter((u) => u.dns !== v.dns)
+  used.push({ dns: v.dns, name: v.name, ts: Math.round(now / 1000), cli: true })
+  try {
+    await $.fs.write(path, JSON.stringify(used.slice(-6)))
+  } catch {
+    // the hook records it on the next vault command anyway
+  }
+}
+
+async function pickVault($, v) {
+  // Production (not provably a sandbox) needs a second press
+  if (!isSandbox(v) && V.confirm !== v.dns) {
+    V.confirm = v.dns
+    V.msg = ''
+    $.ui.invalidate('ui.render')
+    return
+  }
+  V.confirm = ''
+  V.busy = shortName(v.name)
+  V.msg = V.valid ? `Switching to ${V.busy}…` : `Logging in to ${V.busy}: finish in the browser…`
+  $.ui.invalidate('ui.render')
+  const r = V.valid ? await vrun($, ['switch', '--dns', v.dns, '-y']) : await vrun($, ['login', '--dns', v.dns, '-y'], 180000)
+  now = await $.clock.now()
+  V.busy = ''
+  if (r.exitCode === 0) {
+    await vaultRefresh($)
+    if (V.current === v.dns) await recordUsed($, v)
+    V.msg = V.current === v.dns ? `Now on ${shortName(v.name)}.` : `Command finished but the CLI is on ${shortName(V.list.find((x) => x.dns === V.current)?.name || V.current)}.`
+    await vaultRefresh($)
+  } else {
+    V.msg = 'Failed: ' + clip(String(r.stderr || r.stdout || 'no output').trim().split('\n')[0], 120)
+  }
+  $.ui.invalidate('ui.render')
+}
+
+async function loginPlain($) {
+  // No Vault named: the CLI's own picker opens in the browser (first login ever)
+  V.busy = 'login'
+  V.msg = 'Logging in: finish in the browser…'
+  $.ui.invalidate('ui.render')
+  const r = await vrun($, ['login', '-y'], 180000)
+  now = await $.clock.now()
+  V.busy = ''
+  if (r.exitCode === 0) await vaultRefresh($)
+  V.msg = r.exitCode === 0 ? 'Logged in.' : 'Failed: ' + clip(String(r.stderr || r.stdout || 'no output').trim().split('\n')[0], 120)
+  $.ui.invalidate('ui.render')
+}
+
+async function openVaultPicker($) {
+  now = await $.clock.now()
+  const surface = await $.session.surface()
+  await vaultRefresh($)
+  if (!surface) {
+    return V.list.map((v) => `${v.dns === V.current ? '▸' : ' '} ${isSandbox(v) ? '  ' : '⚠ '}${shortName(v.name)}  ${v.dns}`).join('\n') || 'No Vaults known. Run: vault login'
+  }
+  V.confirm = ''
+  V.msg = ''
+  V.open = true
+  await $.ui.open({ id: VPANE, title: 'Vaults', focus: true, closeOnEscape: true })
+  return ''
+}
+
+function drawVaultPicker($, e) {
+  const { Box, Text, Button } = $.ui.resolve(e)
+  const head = V.valid
+    ? Text({ dimColor: true, children: ['Signed in. Click a Vault to switch the CLI to it. ⚠ asks twice.'] })
+    : Text({ color: 'red', children: ['Not signed in. Click a Vault to log in to it (opens your browser).'] })
+  const rows = V.list.map((v, i) => {
+    const sb = isSandbox(v)
+    const confirm = V.confirm === v.dns
+    const label = (v.dns === V.current ? '▸ ' : '  ') + (confirm ? 'press again to confirm: ' : '') + shortName(v.name)
+    const tag = sb ? Text({ color: 'green', children: ['sandbox'] }) : Text({ color: 'yellow', bold: true, children: ['⚠ not a sandbox'] })
+    const extra = V.used.includes(v.dns) ? Text({ dimColor: true, children: ['used in this chat'] }) : Text({ children: [''] })
+    const props = { key: 'v-' + v.dns, label, plain: true, dimColor: !!V.busy, onPress: () => (V.busy ? undefined : pickVault($, v)) }
+    if (i < 9) props.hotkey = String(i + 1)
+    return Box({ flexDirection: 'row', columnGap: 2, children: [Button(props), tag, extra] })
+  })
+  const children = [head, Box({ flexDirection: 'column', children: rows.length ? rows : [Text({ dimColor: true, children: ['No Vaults known yet. Use "log in" below.'] })] })]
+  children.push(Button({ key: 'v-login', label: V.valid ? 'log in again (browser)' : 'log in (browser picks the Vault)', hotkey: 'l', plain: true, dimColor: !!V.busy, onPress: () => (V.busy ? undefined : loginPlain($)) }))
+  if (V.msg) children.push(Text({ color: V.msg.startsWith('Failed') ? 'red' : undefined, dimColor: !V.msg.startsWith('Failed'), children: [V.msg] }))
+  return Box({ flexDirection: 'column', rowGap: 1, children })
 }
 
 function footerLabel() {

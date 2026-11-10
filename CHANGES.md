@@ -1,5 +1,6 @@
 # Changes from Nate Herk's originals
 
+- cache-keeper 2.1.0: Vault picker. A `vault` button on the band (reads `vault login` in red when the CLI session is gone; hotkey v) and `/vault` open a pane listing every Vault the login reaches (`vault list`), or the cached list when logged out. One click switches (`vault switch --dns`) or logs in (`vault login --dns`, opens the browser). Non-sandbox Vaults (amber ⚠) need a second press. Plain `log in` runs `vault login` so the CLI's own picker handles a first-ever login.
 - cache-keeper 2.0.1: the band (handoff button, session cost) now always shows, including in resumed chats; cache shows "unknown until next message" until the first prompt.
 - cache-keeper 2.0.0: handoff is one click. `runHandoff` sets `H.auto`; once the handoff is captured, the chat clears and continues by itself (waits up to ~10s for the handoff turn to end). `/handoff continue` and the `clear and continue` button still work. Earlier local edit kept: the `ctx <tokens>` segment is removed from the band (the status line shows context fill).
 - recording-mode, goal-meter, collision-guard 1.1.0: unchanged code; version bumped and author line added.
