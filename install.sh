@@ -40,7 +40,9 @@ for m in $MODS; do
   claude plugin uninstall "$m@nateherk-mods" >/dev/null 2>&1 && echo "removed $m@nateherk-mods" || true
 done
 
-claude plugin marketplace add "$HERE" >/dev/null 2>&1 || claude plugin marketplace update ai-champion-mods
+claude plugin marketplace add "$HERE" >/dev/null 2>&1 || true
+# Always refresh: re-adding an existing marketplace does not re-read it, so updates would silently stay on the old version
+claude plugin marketplace update ai-champion-mods >/dev/null 2>&1 || true
 for m in $MODS; do
   claude plugin install "$m@ai-champion-mods" >/dev/null 2>&1 || claude plugin update "$m@ai-champion-mods"
   echo "installed $m"

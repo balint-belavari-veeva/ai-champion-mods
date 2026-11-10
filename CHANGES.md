@@ -1,5 +1,7 @@
 # Changes from Nate Herk's originals
 
+- install.sh: always runs `claude plugin marketplace update` before installing/updating plugins (previously skipped when `marketplace add` succeeded, which left stale plugin versions).
+
 - cache-keeper 2.2.1: status line no longer shows the Vault segment (picker only). Picker colours just the Vault's name (green sandbox, yellow production) while signed in; the tag and "used in this chat" stay dim.
 - cache-keeper 2.2.0: Vault picker rows are coloured as a whole (green sandbox, yellow production) while signed in, plain when signed out; the tag now reads `⚠ production` instead of `⚠ not a sandbox`. New `board` band button (hotkey b) opens the Sessions board, same as `/board`.
 - cache-keeper 2.1.0: Vault picker. A `vault` button on the band (reads `vault login` in red when the CLI session is gone; hotkey v) and `/vault` open a pane listing every Vault the login reaches (`vault list`), or the cached list when logged out. One click switches (`vault switch --dns`) or logs in (`vault login --dns`, opens the browser). Non-sandbox Vaults (amber ⚠) need a second press. Plain `log in` runs `vault login` so the CLI's own picker handles a first-ever login.
