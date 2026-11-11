@@ -862,7 +862,7 @@ export function register(on) {
 // session is gone. The list is `vault list` (every Vault this login reaches);
 // without a session it falls back to the names cached by hooks/vault-track.py.
 const VPANE = 'vault-picker'
-const V = { list: [], current: '', valid: true, confirm: '', busy: '', msg: '', used: [], open: false, filter: '', refreshing: false, pending: '', dots: 0 }
+const V = { user: '', list: [], current: '', valid: true, confirm: '', busy: '', msg: '', used: [], open: false, filter: '', refreshing: false, pending: '', dots: 0 }
 // Same heuristic as the status line: anything not provably a sandbox counts as production.
 const SANDBOX_RE = /^sb-|sandbox|uat|sbx|template|demo|test|rebuild|-dev[.-]|sit-20/
 const isSandbox = (v) => SANDBOX_RE.test((v.dns + ' ' + v.name).toLowerCase())
@@ -891,6 +891,18 @@ async function vaultStatus($) {
   V.valid = st.exitCode === 0 && /^Auth:.*valid/im.test(out) && !/expired|invalid/i.test(out)
   const m = /^DNS:\s*(\S+)/m.exec(out)
   V.current = m ? m[1].toLowerCase() : ''
+  // login needs --username when no TTY (the CLI would prompt); status still prints it when the session is expired
+  const u = /^User:\s*(\S+)/m.exec(out)
+  if (u) V.user = u[1]
+}
+
+// Username for a non-interactive browser login: from status, else the stored users list.
+async function loginUser($) {
+  if (V.user) return V.user
+  const r = await vrun($, ['user', 'list'])
+  const m = /([^\s│┆]+@[^\s│┆]+)/.exec(r.stdout || '')
+  if (m) V.user = m[1]
+  return V.user || ''
 }
 
 async function vaultRefresh($) {
@@ -943,7 +955,12 @@ async function pickVault($, v) {
   V.dots = 0
   V.msg = V.valid ? `Switching to ${V.busy}` : `Logging in to ${V.busy}: finish in the browser`
   $.ui.invalidate('ui.render')
-  const r = V.valid ? await vrun($, ['switch', '--dns', v.dns, '-y']) : await vrun($, ['login', '--dns', v.dns, '-y'], 180000)
+  let r
+  if (V.valid) r = await vrun($, ['switch', '--dns', v.dns, '-y'])
+  else {
+    const user = await loginUser($)
+    r = user ? await vrun($, ['login', '--dns', v.dns, '--username', user, '-y'], 180000) : { exitCode: 1, stderr: 'No stored user: run `vault login` once in a terminal' }
+  }
   now = await $.clock.now()
   V.busy = ''
   if (r.exitCode === 0) {
@@ -963,7 +980,8 @@ async function loginPlain($) {
   V.dots = 0
   V.msg = 'Logging in: finish in the browser'
   $.ui.invalidate('ui.render')
-  const r = await vrun($, ['login', '-y'], 180000)
+  const user = await loginUser($)
+  const r = user ? await vrun($, ['login', '--username', user, '-y'], 180000) : { exitCode: 1, stderr: 'No stored user: run `vault login` once in a terminal' }
   now = await $.clock.now()
   V.busy = ''
   if (r.exitCode === 0) await vaultRefresh($)
