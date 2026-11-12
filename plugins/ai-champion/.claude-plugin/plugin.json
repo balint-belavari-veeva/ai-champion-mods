@@ -1,0 +1,9 @@
+{
+  "name": "ai-champion",
+  "version": "1.0.0",
+  "description": "One-time setup for the ai-champion-mods marketplace: /ai-champion:setup turns on automatic updates and sets up the status line if that plugin is installed.",
+  "author": {
+    "name": "AI Champion (based on Nate Herk, MIT)"
+  },
+  "license": "MIT"
+}

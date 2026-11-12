@@ -1,6 +1,6 @@
 ---
 name: setup
-description: One-time setup for the statusline plugin. Enables the status line that feeds the cache-keeper context bar and turns on automatic updates for the ai-champion-mods marketplace. Use when the user says "set up the status line", "enable the context bar", or runs /statusline:setup.
+description: One-time setup for the statusline plugin. Enables the status line that feeds the cache-keeper context bar. Use when the user says "set up the status line", "enable the context bar", or runs /statusline:setup.
 disable-model-invocation: true
 ---
 

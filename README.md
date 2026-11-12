@@ -10,21 +10,22 @@ Needs Claude Code 2.1.292 or later (the mods need 2.1.287+), read access to this
 2. In a terminal:
    ```
    claude plugin marketplace add balint-belavari-veeva/ai-champion-mods
+   claude plugin install ai-champion@ai-champion-mods
    claude plugin install cache-keeper@ai-champion-mods
    claude plugin install handoff@ai-champion-mods
    claude plugin install vault-login@ai-champion-mods
    claude plugin install statusline@ai-champion-mods
    claude plugin install veeva-vault-permissions@ai-champion-mods
    ```
-   Pick only the ones you want (see the table). (In Claude Code: `/plugin install cache-keeper --marketplace balint-belavari-veeva/ai-champion-mods`. If the syntax is rejected, check `claude plugin install --help` on your build.)
-3. In Claude Code, once: `/statusline:setup` (enables the status line that feeds the context bar and turns on automatic updates) or, without the status line, `/cache-keeper:setup` (automatic updates only).
+   `ai-champion` is the setup plugin (install it always); pick only the others you want (see the table). (In Claude Code: `/plugin install cache-keeper --marketplace balint-belavari-veeva/ai-champion-mods`. If the syntax is rejected, check `claude plugin install --help` on your build.)
+3. In Claude Code, once, after installing the plugins you want: `/ai-champion:setup`. It turns on automatic updates for all of them and, if you installed `statusline`, enables the status line (re-run it after installing `statusline` later).
 4. Open a **new** chat (mods load at chat start).
 
 If you installed Nate Herk's originals (`@nateherk-mods`), uninstall them first: the commands clash.
 
 ## Updates
 
-- **Automatic:** `/statusline:setup` or `/cache-keeper:setup` sets `autoUpdate` for this marketplace in your settings. Claude Code checks in the background after your first message of a session (plus a random delay of up to 10 minutes). Without setup: `/plugin` → Marketplaces → `ai-champion-mods` → enable auto-update.
+- **Automatic:** `/ai-champion:setup` sets `autoUpdate` for this marketplace in your settings. Claude Code checks in the background after your first message of a session (plus a random delay of up to 10 minutes). Without setup: `/plugin` → Marketplaces → `ai-champion-mods` → enable auto-update.
 - **Not live.** A running chat keeps the version it loaded. Skills apply after `/reload-plugins` or a new chat. The mods only load at chat start, so they always need a **new chat**. This is the engine, not something the plugins can change.
 - **Now:** `claude plugin marketplace update ai-champion-mods`, then a new chat.
 - Plugins pin a `version`, so an update only arrives when the maintainer bumps it (logged in `CHANGES.md`).
@@ -35,6 +36,7 @@ Each plugin works on its own. Each mod that draws above the prompt adds its own 
 
 | Plugin | What it does |
 |---|---|
+| `ai-champion` | Setup only: `/ai-champion:setup` (auto-update; status line if `statusline` is installed). |
 | `cache-keeper` | Band: model + context bar (needs `statusline` in the terminal), cache warm/cold, `/keepwarm`, session cost and rewrite cost, cold-send guard. `agents` button (`/ck-agents`): each agent of the chat with status, context, cost. |
 | `handoff` | `handoff` button (`/handoff`): writes a session handoff, clears the chat and continues in a fresh one, one click. Handoffs are saved under `~/.claude/mods-data/handoff/handoffs/`. Includes the `session-handoff` skill. |
 | `vault-login` | Needs the `vault` CLI. `vault` button (`/vault`) and a row showing the CLI's current Vault (green sandbox, yellow production). One click switches the CLI to a Vault, or logs you in (browser) if the session expired. Amber ⚠ Vaults (not provably a sandbox) need a second press. Tracks which Vaults each chat used. |

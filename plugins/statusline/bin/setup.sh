@@ -13,7 +13,4 @@ if ! jq -e '.statusLine.command' "$SETTINGS" >/dev/null 2>&1; then
   tmp="$(mktemp)"; jq '.statusLine = {"type":"command","command":"bash ~/.claude/statusline-command.sh"}' "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
   echo "status line enabled"
 else echo "status line already set in settings.json (left as is; it must call ~/.claude/statusline-command.sh)"; fi
-# Auto-update for the ai-champion-mods marketplace (so the manual /plugin toggle is not needed)
-tmp="$(mktemp)"; jq '.extraKnownMarketplaces["ai-champion-mods"] = ((.extraKnownMarketplaces["ai-champion-mods"] // {"source":{"source":"github","repo":"balint-belavari-veeva/ai-champion-mods"}}) + {"autoUpdate":true})' "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
-echo "auto-update enabled for the ai-champion-mods marketplace"
 echo "Done. Open a NEW chat."
