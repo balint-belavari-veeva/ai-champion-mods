@@ -1,11 +1,34 @@
 {
   "name": "ai-champion-mods",
-  "description": "Veeva Services AI Champion Claude Code mods: one-click handoff, goal meter, recording mode, collision guard, cache keeper",
-  "owner": { "name": "AI Champion" },
+  "description": "Veeva Services AI Champion Claude Code mods and skills: one-click handoff, Vault picker, cache keeper, goal meter, recording mode, collision guard, Vault permission tracing",
+  "owner": {
+    "name": "AI Champion"
+  },
   "plugins": [
-    { "name": "cache-keeper", "source": "./plugins/cache-keeper", "description": "One-click handoff (clear and continue), cache warm/cold band, keep-warm, /board" },
-    { "name": "recording-mode", "source": "./plugins/recording-mode", "description": "/rec masks secrets and personal data on screen while recording" },
-    { "name": "goal-meter", "source": "./plugins/goal-meter", "description": "Progress bar and ETA for /goal" },
-    { "name": "collision-guard", "source": "./plugins/collision-guard", "description": "Asks before editing a file another open chat changed" }
+    {
+      "name": "cache-keeper",
+      "source": "./plugins/cache-keeper",
+      "description": "One-click handoff (clear and continue), cache warm/cold band, keep-warm, /board"
+    },
+    {
+      "name": "recording-mode",
+      "source": "./plugins/recording-mode",
+      "description": "/rec masks secrets and personal data on screen while recording"
+    },
+    {
+      "name": "goal-meter",
+      "source": "./plugins/goal-meter",
+      "description": "Progress bar and ETA for /goal"
+    },
+    {
+      "name": "collision-guard",
+      "source": "./plugins/collision-guard",
+      "description": "Asks before editing a file another open chat changed"
+    },
+    {
+      "name": "veeva-vault-permissions",
+      "source": "./plugins/veeva-vault-permissions",
+      "description": "Skill: who can access a Vault object or field, and which profile or permission set grants it"
+    }
   ]
 }

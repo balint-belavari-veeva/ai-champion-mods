@@ -14,25 +14,19 @@ command -v claude >/dev/null || { echo "claude CLI not found"; exit 1; }
 if [ "$1" != "--no-statusline" ]; then
   command -v jq >/dev/null || { echo "jq is required for the status line (brew install jq)"; exit 1; }
   command -v vault >/dev/null || echo "note: 'vault' CLI not found: the status line will show 'vault: logged out'. Install it and run 'vault upgrade'."
-  if [ -f "$SL" ] && ! cmp -s "$SL" "$HERE/statusline/statusline-command.sh"; then
+  if [ -f "$SL" ] && ! cmp -s "$SL" "$HERE/plugins/cache-keeper/bin/statusline.sh"; then
     cp "$SL" "$SL.bak-$(date +%Y%m%d%H%M%S)"
     echo "backed up your existing status line"
   fi
-  cp "$HERE/statusline/statusline-command.sh" "$SL"
+  cp "$HERE/plugins/cache-keeper/bin/statusline.sh" "$SL"
   [ -f "$SETTINGS" ] || echo '{}' > "$SETTINGS"
   if ! jq -e '.statusLine.command' "$SETTINGS" >/dev/null 2>&1; then
     tmp="$(mktemp)"
     jq '.statusLine = {"type":"command","command":"bash ~/.claude/statusline-command.sh"}' "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
     echo "status line enabled in settings.json"
   fi
-  # Per-chat Vault tracking: PostToolUse hook records which Vaults each chat uses
-  mkdir -p "$HOME/.claude/hooks"
-  cp "$HERE/hooks/vault-track.py" "$HOME/.claude/hooks/vault-track.py"
-  if ! jq -e '[.hooks.PostToolUse[]?.hooks[]?.command] | any(test("vault-track.py"))' "$SETTINGS" >/dev/null 2>&1; then
-    tmp="$(mktemp)"
-    jq '.hooks.PostToolUse = ((.hooks.PostToolUse // []) + [{"matcher":"Bash","hooks":[{"type":"command","command":"python3 -I ~/.claude/hooks/vault-track.py"}]}])' "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
-    echo "vault tracking hook enabled in settings.json"
-  fi
+  # The Vault tracking hook (vault-track.py) now ships inside the cache-keeper plugin; nothing to register here.
+  # If an older install registered ~/.claude/hooks/vault-track.py in settings.json, remove that entry (it would run twice).
 fi
 
 # Remove Nate Herk's originals if present (same commands would clash)

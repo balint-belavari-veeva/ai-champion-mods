@@ -1,0 +1,6 @@
+{
+  "name": "veeva-vault-permissions",
+  "version": "1.0.0",
+  "description": "Check whether a Vault user can read/edit/create/delete an object or field, and trace which security profile and permission sets grant it. Works through the signed-in vault CLI.",
+  "author": { "name": "AI Champion" }
+}
