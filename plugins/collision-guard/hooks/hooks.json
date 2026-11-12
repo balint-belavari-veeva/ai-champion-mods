@@ -1,4 +1,0 @@
-{
-  "description": "Collision Guard hooks module",
-  "modules": ["./register.mjs"]
-}

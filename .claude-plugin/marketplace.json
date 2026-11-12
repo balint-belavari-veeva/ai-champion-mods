@@ -1,6 +1,6 @@
 {
   "name": "ai-champion-mods",
-  "description": "Veeva Services AI Champion Claude Code mods and skills: one-click handoff, Vault picker, cache keeper, goal meter, recording mode, collision guard, Vault permission tracing",
+  "description": "Veeva Services AI Champion Claude Code mods and skills: cache keeper band, one-click handoff, Vault login picker, context status line, Vault permission tracing",
   "owner": {
     "name": "AI Champion"
   },
@@ -8,22 +8,22 @@
     {
       "name": "cache-keeper",
       "source": "./plugins/cache-keeper",
-      "description": "One-click handoff (clear and continue), cache warm/cold band, keep-warm, /board"
+      "description": "Context + cache-warm band, keep-warm, session and rewrite cost, cold-send guard, agents button"
     },
     {
-      "name": "recording-mode",
-      "source": "./plugins/recording-mode",
-      "description": "/rec masks secrets and personal data on screen while recording"
+      "name": "handoff",
+      "source": "./plugins/handoff",
+      "description": "One-click session handoff: clear the chat and continue in a fresh one with /handoff or the handoff button"
     },
     {
-      "name": "goal-meter",
-      "source": "./plugins/goal-meter",
-      "description": "Progress bar and ETA for /goal"
+      "name": "vault-login",
+      "source": "./plugins/vault-login",
+      "description": "Vault picker: click a Vault to switch the vault CLI or log in; current Vault row, /vault"
     },
     {
-      "name": "collision-guard",
-      "source": "./plugins/collision-guard",
-      "description": "Asks before editing a file another open chat changed"
+      "name": "statusline",
+      "source": "./plugins/statusline",
+      "description": "Status line script that feeds the context bar (terminal); /statusline:setup"
     },
     {
       "name": "veeva-vault-permissions",

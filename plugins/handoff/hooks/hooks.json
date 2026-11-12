@@ -1,0 +1,4 @@
+{
+  "description": "Handoff hooks module",
+  "modules": ["./register.mjs"]
+}

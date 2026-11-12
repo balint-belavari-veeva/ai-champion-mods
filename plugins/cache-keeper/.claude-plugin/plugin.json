@@ -1,7 +1,7 @@
 {
   "name": "cache-keeper",
-  "version": "2.10.1",
-  "description": "Keeps a big chat's prompt cache warm, warns before an expensive cold restart, shows every local chat on one board (/board), and hands a chat off to a fresh one (/handoff)",
+  "version": "2.12.0",
+  "description": "Context + cache-warm band, keep-warm, session and rewrite cost, cold-send guard, agents button (/ck-agents). Vault picker, handoff and status line are separate plugins.",
   "author": {
     "name": "AI Champion (based on Nate Herk, MIT)"
   },

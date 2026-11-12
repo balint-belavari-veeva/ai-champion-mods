@@ -1,5 +1,5 @@
 #!/bin/bash
-# One-time (re-runnable) setup for the cache-keeper mods: enables the status line that feeds the
+# One-time (re-runnable) setup for the statusline plugin: enables the status line that feeds the
 # context bar. Needs jq. Safe to re-run; refreshes the copied script after plugin updates.
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"

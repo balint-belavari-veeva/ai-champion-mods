@@ -1,0 +1,6 @@
+{
+  "name": "statusline",
+  "version": "1.0.0",
+  "description": "Terminal status line script that hands the context % to the cache-keeper band. Run /statusline:setup once.",
+  "author": { "name": "AI Champion" }
+}
