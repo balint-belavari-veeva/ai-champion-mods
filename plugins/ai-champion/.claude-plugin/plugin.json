@@ -1,9 +1,16 @@
 {
   "name": "ai-champion",
-  "version": "1.0.0",
-  "description": "One-time setup for the ai-champion-mods marketplace: /ai-champion:setup turns on automatic updates and sets up the status line if that plugin is installed.",
+  "version": "1.1.0",
+  "description": "Install everything: depends on all other ai-champion-mods plugins. Run /ai-champion:setup once afterwards for auto-update and the status line.",
   "author": {
     "name": "AI Champion"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": [
+    "cache-keeper",
+    "handoff",
+    "vault-login",
+    "statusline",
+    "veeva-vault-permissions"
+  ]
 }
