@@ -1,6 +1,6 @@
 #!/bin/bash
 # AI Champion mods: one-command local install.
-#   bash install.sh            install (status line + cache-keeper + vault-login), replacing Nate Herk's originals
+#   bash install.sh            install (status line + cache-keeper + vault-login), replacing the older nateherk-mods bundle
 #   bash install.sh --no-statusline   mods only
 # Safe to re-run. Open a NEW Claude Code chat afterwards (mods load at chat start).
 set -e
@@ -29,7 +29,7 @@ if [ "$1" != "--no-statusline" ]; then
   # If an older install registered ~/.claude/hooks/vault-track.py in settings.json, remove that entry (it would run twice).
 fi
 
-# Remove Nate Herk's originals if present (same commands would clash)
+# Remove the older nateherk-mods bundle if present (same commands would clash)
 for m in $MODS; do
   claude plugin uninstall "$m@nateherk-mods" >/dev/null 2>&1 && echo "removed $m@nateherk-mods" || true
 done

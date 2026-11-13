@@ -2,6 +2,6 @@
   "name": "handoff",
   "version": "1.0.0",
   "description": "One-click session handoff: writes a handoff, clears the chat and continues in a fresh one. /handoff, a handoff button above the prompt, and the session-handoff skill.",
-  "author": { "name": "AI Champion (based on Nate Herk, MIT)" },
+  "author": { "name": "AI Champion" },
   "license": "MIT"
 }

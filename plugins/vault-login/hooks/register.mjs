@@ -1,6 +1,6 @@
 // Vault Login: a Vault picker for Claude Code. Click a Vault to switch the vault CLI to it,
 // or to log in to it when the session is gone. /vault and a one-row band with the current Vault.
-// Split out of cache-keeper (2.11.0). Based on Nate Herk's mods (MIT, see LICENSE).
+// Split out of cache-keeper (2.11.0). Part of ai-champion-mods (MIT, see LICENSE).
 
 import { clip } from './fmt.mjs'
 

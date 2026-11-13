@@ -1,13 +1,16 @@
 # AI Champion mods and skills for Claude Code
 
-Claude Code add-ons for Veeva Services colleagues: a band above the prompt (context, cache state, cost), one-click handoff (own plugin), a Vault picker with click-to-log-in, plus a Vault permission-tracing skill. Not tied to any customer. Based on Nate Herk's Claude Code mods (MIT, see `LICENSE`).
+Claude Code add-ons for Veeva Services colleagues: a band above the prompt (context, cache state, cost), one-click handoff (own plugin), a Vault picker with click-to-log-in, plus a Vault permission-tracing skill. Not tied to any customer.
 
 ## Install (per colleague)
 
-Needs Claude Code 2.1.292 or later (the mods need 2.1.287+), read access to this GitHub repo (private), `jq`, `python3`, and for the Vault features the `vault` CLI (`vault upgrade` for a current build).
+Needs Claude Code 2.1.292 or later (the mods need 2.1.287+), `jq`, `python3`, and for the Vault features the `vault` CLI (`vault upgrade` for a current build).
 
-1. Git credentials, once (auto-update needs them too; `GITHUB_TOKEN` alone does not work): `gh auth login` then `gh auth setup-git`, or an SSH key.
-2. In a terminal:
+**Easiest:** tell Claude Code: *Install the mods by following https://raw.githubusercontent.com/balint-belavari-veeva/ai-champion-mods/main/INSTALL-FOR-CLAUDE.md*
+
+Or by hand:
+
+1. In a terminal:
    ```
    claude plugin marketplace add balint-belavari-veeva/ai-champion-mods
    claude plugin install ai-champion@ai-champion-mods
@@ -18,10 +21,10 @@ Needs Claude Code 2.1.292 or later (the mods need 2.1.287+), read access to this
    claude plugin install veeva-vault-permissions@ai-champion-mods
    ```
    `ai-champion` is the setup plugin (install it always); pick only the others you want (see the table). (In Claude Code: `/plugin install cache-keeper --marketplace balint-belavari-veeva/ai-champion-mods`. If the syntax is rejected, check `claude plugin install --help` on your build.)
-3. In Claude Code, once, after installing the plugins you want: `/ai-champion:setup`. It turns on automatic updates for all of them and, if you installed `statusline`, enables the status line (re-run it after installing `statusline` later).
-4. Open a **new** chat (mods load at chat start).
+2. In Claude Code, once, after installing the plugins you want: `/ai-champion:setup`. It turns on automatic updates for all of them and, if you installed `statusline`, enables the status line (re-run it after installing `statusline` later).
+3. Open a **new** chat (mods load at chat start).
 
-If you installed Nate Herk's originals (`@nateherk-mods`), uninstall them first: the commands clash.
+If you installed the older `nateherk-mods` bundle, uninstall them first: the commands clash.
 
 ## Updates
 
@@ -49,4 +52,4 @@ Each plugin works on its own. Each mod that draws above the prompt adds its own 
 - `bash install.sh` installs from this folder (local development; refreshes the status line script). Validate with `claude plugin validate --strict plugins/<name>`.
 - One hooks module per plugin (engine rule), so `cache-keeper`, `handoff` and `vault-login` are separate plugins. Several plugins can hook the same event and each draws its own row above the prompt.
 - Publishing: `git subtree push --prefix=projects/ai-champion/ai-champion-mods <remote> main` from `claude-home`.
-- Changes from Nate's originals: `CHANGES.md`.
+- Changelog: `CHANGES.md`.

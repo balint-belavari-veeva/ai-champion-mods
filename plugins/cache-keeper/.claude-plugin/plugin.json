@@ -3,7 +3,7 @@
   "version": "2.12.1",
   "description": "Context + cache-warm band, keep-warm, session and rewrite cost, cold-send guard, agents button (/ck-agents). Vault picker, handoff and status line are separate plugins.",
   "author": {
-    "name": "AI Champion (based on Nate Herk, MIT)"
+    "name": "AI Champion"
   },
   "license": "MIT"
 }

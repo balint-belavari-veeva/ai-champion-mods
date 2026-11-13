@@ -1,5 +1,5 @@
 // Handoff: one click writes a session handoff, clears the chat and continues in a fresh one.
-// Split out of cache-keeper (2.12.0). Based on Nate Herk's mods (MIT, see LICENSE).
+// Split out of cache-keeper (2.12.0). Part of ai-champion-mods (MIT, see LICENSE).
 
 import { clip, basename } from './fmt.mjs'
 
