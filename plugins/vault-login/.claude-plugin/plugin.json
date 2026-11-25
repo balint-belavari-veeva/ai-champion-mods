@@ -1,6 +1,6 @@
 {
   "name": "vault-login",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Vault picker for Claude Code: click a Vault to switch the vault CLI to it, or to log in to it. /vault, a one-row band with the current Vault, per-chat active Vaults.",
   "author": { "name": "AI Champion" },
   "license": "MIT"

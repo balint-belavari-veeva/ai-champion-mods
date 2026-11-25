@@ -124,7 +124,7 @@ async function pickVault($, v) {
   if (V.valid) r = await vrun($, ['switch', '--dns', v.dns, '-y'])
   else {
     const user = await loginUser($)
-    r = user ? await vrun($, ['login', '--dns', v.dns, '--username', user, '-y'], 180000) : { exitCode: 1, stderr: 'No stored user: run `vault login` once in a terminal' }
+    r = user ? await vrun($, ['login', '--dns', v.dns, '--username', user, '--scope', 'global', '-y'], 180000) : { exitCode: 1, stderr: 'No stored user: run `vault login` once in a terminal' }
   }
   now = await $.clock.now()
   V.busy = ''
@@ -146,7 +146,7 @@ async function loginPlain($) {
   V.msg = 'Logging in: finish in the browser'
   $.ui.invalidate('ui.render')
   const user = await loginUser($)
-  const r = user ? await vrun($, ['login', '--username', user, '-y'], 180000) : { exitCode: 1, stderr: 'No stored user: run `vault login` once in a terminal' }
+  const r = user ? await vrun($, ['login', '--username', user, '--scope', 'global', '-y'], 180000) : { exitCode: 1, stderr: 'No stored user: run `vault login` once in a terminal' }
   now = await $.clock.now()
   V.busy = ''
   if (r.exitCode === 0) await vaultRefresh($)
@@ -207,7 +207,7 @@ function drawVaultPicker($, e) {
   children.push(Input({ key: 'v-search', placeholder: 'Search Vaults…', value: V.filter, submitLabel: 'search', onInput: (val) => { V.filter = val; V.confirm = ''; $.ui.invalidate('ui.render') }, onSubmit: () => {} }))
   children.push(Box({ flexDirection: 'column', children: rows.length ? rows : [Text({ dimColor: true, children: [empty] })] }))
   // On VS Code the login button only shows while signed out
-  if (!(vs && V.valid)) children.push(Button({ key: 'v-login', label: V.valid ? 'log in again (browser)' : 'log in (browser picks the Vault)', plain: true, dimColor: !!V.busy, onPress: () => (V.busy ? undefined : loginPlain($)) }))
+  if (!(vs && V.valid)) children.push(Button({ key: 'v-login', label: V.valid ? 'log in again' : 'log in', plain: true, dimColor: !!V.busy, onPress: () => (V.busy ? undefined : loginPlain($)) }))
   if (V.msg) children.push(Text({ color: V.msg.startsWith('Failed') ? 'red' : undefined, dimColor: !V.msg.startsWith('Failed'), children: [V.msg + (V.busy ? '.'.repeat(V.dots) : '')] }))
   return Box({ flexDirection: 'column', rowGap: 1, children })
 }
