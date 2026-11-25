@@ -1,0 +1,8 @@
+{
+  "name": "vault-triage",
+  "version": "1.0.0",
+  "description": "Triage a Vault CRM issue to a root cause: read-only investigation (vault CLI + VQL + docs), conclusion with evidence, impact, and an optional Zendesk product-support ticket. Read-only guard built in.",
+  "author": { "name": "AI Champion" },
+  "license": "MIT",
+  "keywords": ["veeva", "vault-crm", "triage", "services"]
+}

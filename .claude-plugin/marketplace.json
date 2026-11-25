@@ -34,6 +34,16 @@
       "name": "veeva-vault-permissions",
       "source": "./plugins/veeva-vault-permissions",
       "description": "Skill: who can access a Vault object or field, and which profile or permission set grants it"
+    },
+    {
+      "name": "vault-triage",
+      "source": "./plugins/vault-triage",
+      "description": "Triage a Vault CRM issue to a root cause: read-only investigation, evidence, impact, optional Zendesk ticket; read-only guard built in"
+    },
+    {
+      "name": "humanizer",
+      "source": "./plugins/humanizer",
+      "description": "Skill humanizer:humanizer: rewrites AI-sounding prose for customer-facing drafts (vendored from blader/humanizer 4.0.0, MIT)"
     }
   ]
 }

@@ -1,0 +1,8 @@
+{
+  "name": "humanizer",
+  "version": "4.0.0",
+  "description": "Skill humanizer:humanizer: rewrite AI-sounding prose so it reads like a person wrote it, without changing what it says. Vendored unchanged from blader/humanizer 4.0.0 (MIT, see LICENSE).",
+  "author": { "name": "Siqi Chen (upstream), vendored by AI Champion" },
+  "license": "MIT",
+  "keywords": ["writing", "editing", "humanizer"]
+}

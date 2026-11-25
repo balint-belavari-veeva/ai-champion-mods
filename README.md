@@ -39,6 +39,8 @@ Each plugin works on its own. Each mod that draws above the prompt adds its own 
 | `handoff` | `handoff` button (`/handoff`): writes a session handoff, clears the chat and continues in a fresh one, one click. Handoffs are saved under `~/.claude/mods-data/handoff/handoffs/`. Includes the `session-handoff` skill. |
 | `vault-login` | Needs the `vault` CLI. `vault` button (`/vault`) and a row showing the CLI's current Vault (green sandbox, yellow production). One click switches the CLI to a Vault, or logs you in (browser) if the session expired. Amber ⚠ Vaults (not provably a sandbox) need a second press. Tracks which Vaults each chat used. |
 | `statusline` | Terminal status line script that hands the context % to the `cache-keeper` band. Without it the terminal context bar is empty (VS Code falls back to the chat's own usage). If you already have a status line, setup leaves it alone: call `~/.claude/statusline-command.sh` from yours. |
+| `vault-triage` | Skill `/vault-triage:triage`: describe a Vault CRM issue and it investigates read-only (vault CLI, VQL, config, docs) to a root cause with evidence, impact, and a Zendesk product-support draft if Veeva must answer. Vault CRM only, customer-neutral. A built-in guard blocks any write while it runs. Needs the `vault` CLI. |
+| `humanizer` | Skill `humanizer:humanizer`: rewrites AI-sounding prose for customer-facing drafts. Vendored from blader/humanizer 4.0.0 (MIT). |
 | `veeva-vault-permissions` | Skill: can user X read/edit/create/delete an object or field, and which security profile or permission set grants it. Read-only, through the signed-in `vault` CLI. |
 
 ## Maintainer notes
